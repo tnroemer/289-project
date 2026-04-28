@@ -19,13 +19,13 @@ cd "$REPO_DIR"
 echo "Job started on $(date)"
 echo "Running on node: $(hostname)"
 echo "Working directory: $(pwd)"
-echo "Python location: $(which python)"
-echo "Python version: $(python --version)"
 
 module load anaconda3/2024.10-1
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /jet/home/troemer/.conda/envs/stat214
 source /ocean/projects/mth250011p/troemer/.wandb_env
+echo "Python location: $(which python)"
+echo "Python version: $(python --version)"
 PYTHON_BIN="python"
 export PYTHONUNBUFFERED=1
 

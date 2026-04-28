@@ -12,18 +12,18 @@ import wandb
 import shutil
 
 os.environ["KAGGLEHUB_CACHE"] = "/ocean/projects/mth250011p/troemer/"
-
-# Download latest version
-path = kagglehub.dataset_download("kmader/skin-cancer-mnist-ham10000")
-
-metadata = pd.read_csv(path + "/HAM10000_metadata.csv")
-
 work_path = '/ocean/projects/mth250011p/troemer/datasets/skin-cancer-mnist-ham10000'
-shutil.copytree(path + "/HAM10000_images_part_1", work_path + "/HAM10000_images", dirs_exist_ok=True)
-shutil.copytree(path + "/HAM10000_images_part_2", work_path + "/HAM10000_images", dirs_exist_ok=True)
+
+if not os.path.exists("/ocean/projects/mth250011p/troemer/datasets/skin-cancer-mnist-ham10000"):
+    # Download latest version
+    path = kagglehub.dataset_download("kmader/skin-cancer-mnist-ham10000")
+    metadata = pd.read_csv(path + "/HAM10000_metadata.csv")
+
+    shutil.copytree(path + "/HAM10000_images_part_1", work_path + "/HAM10000_images", dirs_exist_ok=True)
+    shutil.copytree(path + "/HAM10000_images_part_2", work_path + "/HAM10000_images", dirs_exist_ok=True)
 
 image_dir = work_path + "/HAM10000_images"
-csv_path = path + "/HAM10000_metadata.csv"
+csv_path = "/ocean/projects/mth250011p/troemer/datasets/kmader/skin-cancer-mnist-ham10000/versions/2/HAM10000_metadata.csv"
 
 df = pd.read_csv(csv_path)
 df["image"] = df["image_id"].apply(lambda x: os.path.join(image_dir, x + ".jpg"))
