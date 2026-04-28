@@ -58,12 +58,6 @@ config = {
     "num_classes": num_classes,
 }
 
-wandb.init(
-    project="skin-cancer-cnn",
-    name="basic-cnn",
-    config=config,
-)
-
 train_transform = transforms.Compose([
     transforms.Resize((image_size, image_size)),
     transforms.RandomHorizontalFlip(),
@@ -101,26 +95,6 @@ def collate_fn(batch):
         "labels": torch.tensor([x["label"] for x in batch]),
     }
 
-train_loader = DataLoader(
-    train_ds,
-    batch_size=batch_size,
-    shuffle=True,
-    collate_fn=collate_fn,
-    num_workers=4,
-    pin_memory=True,
-)
-
-val_loader = DataLoader(
-    val_ds,
-    batch_size=batch_size,
-    shuffle=False,
-    collate_fn=collate_fn,
-    num_workers=4,
-    pin_memory=True,
-)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 class BasicCNN(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -156,13 +130,6 @@ class BasicCNN(nn.Module):
         x = self.classifier(x)
         return x
     
-model = BasicCNN(num_classes=num_classes).to(device)
-
-criterion = nn.CrossEntropyLoss()
-optimizer = AdamW(model.parameters(), lr=learning_rate)
-
-wandb.watch(model, log="gradients", log_freq=100)
-
 def train_one_epoch(model, loader, optimizer, criterion, device):
     model.train()
 
@@ -171,8 +138,8 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     total = 0
 
     for batch in loader:
-        images = batch["pixel_values"].to(device)
-        labels = batch["labels"].to(device)
+        images = batch["pixel_values"].to(device, non_blocking=True)
+        labels = batch["labels"].to(device, non_blocking=True)
 
         optimizer.zero_grad()
 
@@ -202,8 +169,8 @@ def evaluate(model, loader, criterion, device):
 
     with torch.no_grad():
         for batch in loader:
-            images = batch["pixel_values"].to(device)
-            labels = batch["labels"].to(device)
+            images = batch["pixel_values"].to(device, non_blocking=True)
+            labels = batch["labels"].to(device, non_blocking=True)
 
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -218,55 +185,152 @@ def evaluate(model, loader, criterion, device):
     accuracy = correct / total
 
     return avg_loss, accuracy
+def main():
 
-best_val_acc = 0.0
-os.makedirs("/ocean/projects/mth250011p/troemer/checkpoints", exist_ok=True)
-best_model_path = "/ocean/projects/mth250011p/troemer/checkpoints/skin-basic-cnn-best-model.pt"
+    # dataset setup
 
+    # train_ds / val_ds setup
 
-for epoch in range(num_epochs):
-    train_loss, train_acc = train_one_epoch(
-        model, train_loader, optimizer, criterion, device
+    # transforms
+
+    # dataloaders
+
+    train_loader = DataLoader(
+
+        train_ds,
+
+        batch_size=batch_size,
+
+        shuffle=True,
+
+        collate_fn=collate_fn,
+
+        num_workers=4,
+
+        pin_memory=True,
+
     )
 
-    val_loss, val_acc = evaluate(
-        model, val_loader, criterion, device
+    val_loader = DataLoader(
+
+        val_ds,
+
+        batch_size=batch_size,
+
+        shuffle=False,
+
+        collate_fn=collate_fn,
+
+        num_workers=4,
+
+        pin_memory=True,
+
     )
 
-    wandb.log({
-        "epoch": epoch + 1,
-        "train/loss": train_loss,
-        "train/accuracy": train_acc,
-        "val/loss": val_loss,
-        "val/accuracy": val_acc,
-    })
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(
-        f"Epoch {epoch+1}/{num_epochs} | "
-        f"Train Loss: {train_loss:.4f} | "
-        f"Train Acc: {train_acc:.4f} | "
-        f"Val Loss: {val_loss:.4f} | "
-        f"Val Acc: {val_acc:.4f}"
+    wandb.login(key=os.environ["WANDB_API_KEY"])
+
+    wandb.init(
+
+        entity="tnroemer-berk",
+
+        project="skin-cancer-cnn",
+
+        name="basic-cnn",
+
+        config=config,
+
     )
 
-    if val_acc > best_val_acc:
-        best_val_acc = val_acc
+    model = BasicCNN(num_classes=num_classes).to(device)
 
-        torch.save({
+    criterion = nn.CrossEntropyLoss()
+
+    optimizer = AdamW(model.parameters(), lr=learning_rate)
+
+    wandb.watch(model, log="gradients", log_freq=100)
+
+    best_val_acc = 0.0
+
+    os.makedirs("checkpoints", exist_ok=True)
+
+    best_model_path = "checkpoints/best_model.pt"
+
+    for epoch in range(num_epochs):
+
+        train_loss, train_acc = train_one_epoch(
+
+            model, train_loader, optimizer, criterion, device
+
+        )
+
+        val_loss, val_acc = evaluate(
+
+            model, val_loader, criterion, device
+
+        )
+
+        wandb.log({
+
             "epoch": epoch + 1,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "val_acc": val_acc,
-            "val_loss": val_loss,
-            "labels": labels,
-            "config": config,
-        }, best_model_path)
 
-        wandb.run.summary["best_val_accuracy"] = best_val_acc
-        wandb.run.summary["best_epoch"] = epoch + 1
+            "train/loss": train_loss,
 
-        wandb.save(best_model_path)
+            "train/accuracy": train_acc,
 
-        print(f"Saved new best model: val_acc={val_acc:.4f}")
+            "val/loss": val_loss,
 
-wandb.finish()
+            "val/accuracy": val_acc,
+
+        })
+
+        print(
+
+            f"Epoch {epoch+1}/{num_epochs} | "
+
+            f"Train Loss: {train_loss:.4f} | "
+
+            f"Train Acc: {train_acc:.4f} | "
+
+            f"Val Loss: {val_loss:.4f} | "
+
+            f"Val Acc: {val_acc:.4f}"
+
+        )
+
+        if val_acc > best_val_acc:
+
+            best_val_acc = val_acc
+
+            torch.save({
+
+                "epoch": epoch + 1,
+
+                "model_state_dict": model.state_dict(),
+
+                "optimizer_state_dict": optimizer.state_dict(),
+
+                "val_acc": val_acc,
+
+                "val_loss": val_loss,
+
+                "labels": labels,
+
+                "config": config,
+
+            }, best_model_path)
+
+            wandb.run.summary["best_val_accuracy"] = best_val_acc
+
+            wandb.run.summary["best_epoch"] = epoch + 1
+
+            wandb.save(best_model_path)
+
+            print(f"Saved new best model: val_acc={val_acc:.4f}")
+
+    wandb.finish()
+
+if __name__ == "__main__":
+
+    main()
