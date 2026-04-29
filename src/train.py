@@ -24,10 +24,10 @@ DATASET_DIR = os.path.join(PROJECT_DIR, "datasets", "skin-cancer-mnist-ham10000"
 IMAGE_DIR = os.path.join(DATASET_DIR, "HAM10000_images")
 CHECKPOINT_DIR = os.path.join(PROJECT_DIR, "checkpoints")
 
-image_size = 128
+image_size = 224
 batch_size = 32
 learning_rate = 1e-4
-num_epochs = 10
+num_epochs = 50
 num_workers = 4
 
 
@@ -90,24 +90,26 @@ class BasicCNN(nn.Module):
         self.features = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),   # 128 -> 64
+            nn.MaxPool2d(2), 
 
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),   # 64 -> 32
+            nn.MaxPool2d(2), 
 
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),   # 32 -> 16
+            nn.MaxPool2d(2), 
 
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),   # 16 -> 8
+            nn.MaxPool2d(2),  
         )
+
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256 * 8 * 8, 256),
+            nn.Linear(256, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, num_classes),
@@ -115,6 +117,7 @@ class BasicCNN(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
+        x = self.pool(x)
         x = self.classifier(x)
         return x
 
@@ -298,6 +301,8 @@ def main():
     best_model_path = os.path.join(CHECKPOINT_DIR, "best_model.pt")
 
     best_val_acc = 0.0
+    patience = 8
+    epochs_without_improvement = 0
 
     for epoch in range(num_epochs):
         train_loss, train_acc = train_one_epoch(
@@ -333,6 +338,7 @@ def main():
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            epochs_without_improvement = 0
 
             checkpoint = {
                 "epoch": epoch + 1,
@@ -352,6 +358,12 @@ def main():
             wandb.save(best_model_path)
 
             print(f"Saved new best model: val_acc={val_acc:.4f}")
+        else:
+            epochs_without_improvement += 1
+        
+        if epochs_without_improvement >= patience:
+            print(f"Early stopping triggered after {epoch + 1} epochs.")
+            break
 
     wandb.finish()
 
