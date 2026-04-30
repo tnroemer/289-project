@@ -26,7 +26,7 @@ CHECKPOINT_DIR = os.path.join(PROJECT_DIR, "checkpoints")
 
 image_size = 128
 batch_size = 32
-learning_rate = 1e-4
+learning_rate = 3e-4
 num_epochs = 50
 num_workers = 4
 
