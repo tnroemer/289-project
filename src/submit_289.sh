@@ -15,7 +15,6 @@ set -euo pipefail
 
 REPO_DIR="/ocean/projects/mth250011p/troemer"
 cd "$REPO_DIR"
-
 echo "Job started on $(date)"
 echo "Running on node: $(hostname)"
 echo "Working directory: $(pwd)"

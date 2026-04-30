@@ -24,7 +24,7 @@ DATASET_DIR = os.path.join(PROJECT_DIR, "datasets", "skin-cancer-mnist-ham10000"
 IMAGE_DIR = os.path.join(DATASET_DIR, "HAM10000_images")
 CHECKPOINT_DIR = os.path.join(PROJECT_DIR, "checkpoints")
 
-image_size = 224
+image_size = 128
 batch_size = 32
 learning_rate = 1e-4
 num_epochs = 50
@@ -34,6 +34,8 @@ num_workers = 4
 # -----------------------
 # Transforms
 # -----------------------
+
+# have to use mean and sd for our particular dataset in normalize
 
 train_transform = transforms.Compose([
     transforms.Resize((image_size, image_size)),
