@@ -2,13 +2,12 @@
 #SBATCH --job-name=create_ham10000_lesion_white_images
 #SBATCH --output=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.out
 #SBATCH --error=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.err
-#SBATCH --partition=GPU-shared
-#SBATCH --gres=gpu:1
+#SBATCH -p RM-shared
 #SBATCH --account=mth250011p
-#SBATCH --nodes=1
+#SBATCH -N 1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=20G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=1900M
 #SBATCH --time=01:00:00
 
 set -euo pipefail
