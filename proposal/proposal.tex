@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{geometry}[top=1cm, left=1cm, right=1cm, bottom=1cm]
+\usepackage{url}
+
+\title{Lesion-Focused Classification for Skin Cancer Detection}
+\author{Tobias Roemer, Thomas Lee and Leo Li}
+\date{April 17, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section*{Introduction and Problem Statement}
+Skin lesion classification is an important application of computer vision in medical diagnosis, with potential use in early skin cancer screening. A common approach is to fine-tune a convolutional neural network on dermoscopic lesion images and predict the lesion class directly from the full image. However, these models may rely not only on the lesion itself, but also on surrounding context such as skin texture, hair, lighting, or imaging artifacts. This raises the question of whether classifiers are learning clinically meaningful lesion features or exploiting irrelevant visual shortcuts. Importantly, should those shortcuts not generalize well, this raises the question whether restricting the image to only the lesion can improve generalizability of the model.
+
+Hence, in this project, we will study whether explicitly localizing the lesion improves skin lesion classification. Our main technical question is: does training on lesion-focused inputs lead to better classification performance and robustness than training on the full image alone? This problem interests us because it combines a medically relevant task with core machine learning questions about representation learning, spurious correlations, and generalization. Importantly, well-designed machine learning algorithms applied to the medical domain can potentially improve treatment and patient outcomes on a scale of millions of people per year in the United States alone.
+
+\section*{Data}
+We plan to use the HAM10000 dataset as our primary classification dataset.\footnote{\url{https://doi.org/10.7910/DVN/DBW86T}} HAM10000 contains over 10,000 dermoscopic images of pigmented skin lesions with diagnostic labels across several lesion categories, making it a standard benchmark for skin lesion classification.
+
+To localize lesions, we plan to use lesion segmentation masks from the ISIC 2018 Task 1 segmentation dataset.\footnote{\url{https://challenge.isic-archive.com/data/#2018}} These masks will allow us to create lesion-focused versions of the input images, such as tight crops around the lesion and images with the background suppressed outside the lesion mask.
+
+If time permits, we will explore an additional clinical dataset such as PAD-UFES-20 to examine whether our crop-then-classify model outperforms the naive approach on a new data source, especially when images are less standardized than dermoscopic images as is the case in PAD-UFS-20.\footnote{\url{https://api.isic-archive.com/collections/406/}}
+
+
+\section*{Model}
+Our baseline model will be a convolutional neural network image classifier, likely ResNet-18 or ResNet-50, fine-tuned on the original lesion images from HAM10000. 
+
+We then proceed to train a model on the ISIC 2018 data to recognize lesion masks and use this model to extract the lesions from the HAM10000 data. We then extract those lesions from the images and create new images of the centered lesions in front of a white background to standardize them. We then fine-tune a separate ResNet classifier.
+
+For the evaluation part, we estimate performance of these classifiers on the same holdout set from HAM10000 and assess whether the extract-then-classify approach improves performance in terms of sensitivity, specificity and predictive accuracy.
+
+Time permitting, we will also examine those metrics on the separate PAD-UFES-20 data to see whether any differences magnify when testing on separately collected and less standardized data.
+
+\section*{Contribution}
+Our expected contribution is a controlled empirical comparison of full-image and lesion-focused classification for skin lesion analysis. Rather than proposing a new architecture, we aim to answer a focused experimental question: whether explicit lesion localization improves performance and reduces reliance on irrelevant background information.
+
+More specifically, we expect our contribution to include:
+(i) a comparison of classification accuracy across full-image and background-suppressed inputs,
+(ii) a robustness evaluation under simple image corruptions such as blur, noise, and brightness shifts, and, time permitting,
+(iii) data on the ability of the models to generalize to new data sources.
+
+Even if lesion-focused inputs do not improve accuracy, that would still be an informative result, since it would suggest that current full-image classifiers are already robust to background variation in this setting.
+
+\section*{Tasks}
+\begin{itemize}
+    \item Tobias Roemer: Fine-tune ResNet on the original images. Performance evaluation.
+    \item Thomas Lee: Fine-tune ResNet on background-suppressed images. Generalization.
+    \item Leo Li: Train object shape model on ISIC data. Robustness evaluation.
+\end{itemize}
+
+\section*{Timeline}
+
+\begin{itemize}
+    \item April 20 -- 26: Fine-tune ResNet on full image data. Start with object mask model.
+    \item April 27 -- May 3: Create background suppressed lesion images and fine-tune ResNet on those images. Examine metrics on test data and compare.
+    \item May 4 -- 10: Writing up of results and test of generalization on new data.
+    \item May 11 -- 15: Final touches.
+\end{itemize}
+
+\end{document}

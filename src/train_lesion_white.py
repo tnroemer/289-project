@@ -7,6 +7,7 @@ import torch
 import wandb
 
 from datasets import Dataset, Image, ClassLabel
+from PIL import Image as PILImage
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -23,9 +24,18 @@ DATA_ROOT = "/ocean/projects/mth250011p/troemer"
 RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "skin-cancer-mnist-ham10000")
 IMAGE_DIR = os.path.join(DATASET_DIR, "HAM10000_images")
+MASK_DIR = os.path.join(RUN_DIR, "data", "predicted-masks")
+
+LESION_DATASET_DIR = os.path.join(
+    DATA_ROOT,
+    "datasets",
+    "skin-cancer-mnist-ham10000-lesion-white",
+)
+LESION_IMAGE_DIR = os.path.join(LESION_DATASET_DIR, "HAM10000_images")
+
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
-MODEL_NAME = "basic_cnn"
+MODEL_NAME = "basic_cnn_lesion_white"
 
 image_size = 128
 batch_size = 32
@@ -104,19 +114,19 @@ class BasicCNN(nn.Module):
         self.features = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2), 
+            nn.MaxPool2d(2),
 
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2), 
+            nn.MaxPool2d(2),
 
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2), 
+            nn.MaxPool2d(2),
 
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),  
+            nn.MaxPool2d(2),
         )
 
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
@@ -163,10 +173,56 @@ def prepare_dataset():
         csv_path = "/ocean/projects/mth250011p/troemer/datasets/kmader/skin-cancer-mnist-ham10000/versions/2/HAM10000_metadata.csv"
 
     df = pd.read_csv(csv_path)
+
+    os.makedirs(LESION_IMAGE_DIR, exist_ok=True)
+
+    created = 0
+    skipped_existing = 0
+    missing_images = 0
+    missing_masks = 0
+
+    for image_id in df["image_id"]:
+        image_path = os.path.join(IMAGE_DIR, image_id + ".jpg")
+        mask_path = os.path.join(MASK_DIR, image_id + "_mask.png")
+        output_path = os.path.join(LESION_IMAGE_DIR, image_id + ".jpg")
+
+        if os.path.exists(output_path):
+            skipped_existing += 1
+            continue
+
+        if not os.path.exists(image_path):
+            missing_images += 1
+            continue
+
+        if not os.path.exists(mask_path):
+            missing_masks += 1
+            continue
+
+        with PILImage.open(image_path) as image, PILImage.open(mask_path) as mask:
+            image = image.convert("RGB")
+            mask = mask.convert("L")
+
+            if mask.size != image.size:
+                mask = mask.resize(image.size, PILImage.NEAREST)
+
+            mask = mask.point(lambda p: 255 if p > 127 else 0)
+
+            white_background = PILImage.new("RGB", image.size, (255, 255, 255))
+            lesion_image = PILImage.composite(image, white_background, mask)
+            lesion_image.save(output_path, quality=95)
+
+        created += 1
+
+    print(f"Created lesion-white images: {created}")
+    print(f"Already existed: {skipped_existing}")
+    print(f"Missing original images: {missing_images}")
+    print(f"Missing masks: {missing_masks}")
+
     df["image"] = df["image_id"].apply(
-        lambda x: os.path.join(IMAGE_DIR, x + ".jpg")
+        lambda x: os.path.join(LESION_IMAGE_DIR, x + ".jpg")
     )
     df["image_path"] = df["image"]
+    df = df[df["image"].apply(os.path.exists)].reset_index(drop=True)
 
     labels = sorted(df["dx"].unique())
     label_feature = ClassLabel(names=labels)
@@ -346,8 +402,9 @@ def main():
 
     config = {
         "model": "BasicCNN",
-        "dataset": "HAM10000",
+        "dataset": "HAM10000-lesion-white",
         "run_dir": RUN_DIR,
+        "mask_dir": MASK_DIR,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "epochs": num_epochs,
@@ -385,7 +442,7 @@ def main():
     run = wandb.init(
         entity="tnroemer-berk",
         project="skin-cancer-cnn",
-        name="basic-cnn",
+        name="basic-cnn-lesion-white",
         config=config,
     )
 
@@ -463,7 +520,7 @@ def main():
             print(f"Saved new best model: val_acc={val_acc:.4f}")
         else:
             epochs_without_improvement += 1
-        
+
         if epochs_without_improvement >= patience:
             print(f"Early stopping triggered after {epoch + 1} epochs.")
             break

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=289_job
-#SBATCH --output=/ocean/projects/mth250011p/troemer/logs/%x-%j.out
-#SBATCH --error=/ocean/projects/mth250011p/troemer/logs/%x-%j.err
+#SBATCH --output=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.out
+#SBATCH --error=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.err
 #SBATCH --partition=GPU-shared
 #SBATCH --gres=gpu:1
 #SBATCH --account=mth250011p
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-REPO_DIR="/ocean/projects/mth250011p/troemer"
+REPO_DIR="/ocean/projects/mth250011p/troemer/skin-lesions"
 cd "$REPO_DIR"
 echo "Job started on $(date)"
 echo "Running on node: $(hostname)"
@@ -34,6 +34,12 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-/jet/home/troemer/.conda/envs/stat214/bin/python train.py
+if [[ -f train.py ]]; then
+    SCRIPT_PATH="train.py"
+else
+    SCRIPT_PATH="src/train.py"
+fi
+
+/jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"
 
 echo "Job finished on $(date)"
