@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=289_lesion_white_job
+#SBATCH --job-name=create_ham10000_lesion_white_images
 #SBATCH --output=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.out
 #SBATCH --error=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.err
 #SBATCH --partition=GPU-shared
@@ -9,7 +9,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=20G
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 
 set -euo pipefail
 
@@ -22,7 +22,6 @@ echo "Working directory: $(pwd)"
 module load anaconda3/2024.10-1
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /jet/home/troemer/.conda/envs/stat214
-source /ocean/projects/mth250011p/troemer/.wandb_env
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
 PYTHON_BIN="python"
@@ -34,10 +33,10 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f train_lesion_white.py ]]; then
-    SCRIPT_PATH="train_lesion_white.py"
+if [[ -f create_ham10000_lesion_white_images.py ]]; then
+    SCRIPT_PATH="create_ham10000_lesion_white_images.py"
 else
-    SCRIPT_PATH="src/train_lesion_white.py"
+    SCRIPT_PATH="src/create_ham10000_lesion_white_images.py"
 fi
 
 /jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"

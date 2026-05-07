@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=289_vit_job
+#SBATCH --job-name=train_ham10000_lesion_white_cnn
 #SBATCH --output=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.out
 #SBATCH --error=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.err
 #SBATCH --partition=GPU-shared
@@ -34,10 +34,10 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f train_vit.py ]]; then
-    SCRIPT_PATH="train_vit.py"
+if [[ -f train_ham10000_lesion_white_cnn.py ]]; then
+    SCRIPT_PATH="train_ham10000_lesion_white_cnn.py"
 else
-    SCRIPT_PATH="src/train_vit.py"
+    SCRIPT_PATH="src/train_ham10000_lesion_white_cnn.py"
 fi
 
 /jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"

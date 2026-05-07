@@ -7,7 +7,6 @@ import torch
 import wandb
 
 from datasets import Dataset, Image, ClassLabel
-from PIL import Image as PILImage
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -24,14 +23,7 @@ DATA_ROOT = "/ocean/projects/mth250011p/troemer"
 RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "skin-cancer-mnist-ham10000")
 IMAGE_DIR = os.path.join(DATASET_DIR, "HAM10000_images")
-MASK_DIR = os.path.join(RUN_DIR, "data", "predicted-masks")
-
-LESION_DATASET_DIR = os.path.join(
-    DATA_ROOT,
-    "datasets",
-    "skin-cancer-mnist-ham10000-lesion-white",
-)
-LESION_IMAGE_DIR = os.path.join(LESION_DATASET_DIR, "HAM10000_images")
+LESION_IMAGE_DIR = os.path.join(RUN_DIR, "data", "lesion-white-images")
 
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
@@ -174,55 +166,22 @@ def prepare_dataset():
 
     df = pd.read_csv(csv_path)
 
-    os.makedirs(LESION_IMAGE_DIR, exist_ok=True)
-
-    created = 0
-    skipped_existing = 0
-    missing_images = 0
-    missing_masks = 0
-
-    for image_id in df["image_id"]:
-        image_path = os.path.join(IMAGE_DIR, image_id + ".jpg")
-        mask_path = os.path.join(MASK_DIR, image_id + "_mask.png")
-        output_path = os.path.join(LESION_IMAGE_DIR, image_id + ".jpg")
-
-        if os.path.exists(output_path):
-            skipped_existing += 1
-            continue
-
-        if not os.path.exists(image_path):
-            missing_images += 1
-            continue
-
-        if not os.path.exists(mask_path):
-            missing_masks += 1
-            continue
-
-        with PILImage.open(image_path) as image, PILImage.open(mask_path) as mask:
-            image = image.convert("RGB")
-            mask = mask.convert("L")
-
-            if mask.size != image.size:
-                mask = mask.resize(image.size, PILImage.NEAREST)
-
-            mask = mask.point(lambda p: 255 if p > 127 else 0)
-
-            white_background = PILImage.new("RGB", image.size, (255, 255, 255))
-            lesion_image = PILImage.composite(image, white_background, mask)
-            lesion_image.save(output_path, quality=95)
-
-        created += 1
-
-    print(f"Created lesion-white images: {created}")
-    print(f"Already existed: {skipped_existing}")
-    print(f"Missing original images: {missing_images}")
-    print(f"Missing masks: {missing_masks}")
-
     df["image"] = df["image_id"].apply(
         lambda x: os.path.join(LESION_IMAGE_DIR, x + ".jpg")
     )
     df["image_path"] = df["image"]
+
+    missing_lesion_images = (~df["image"].apply(os.path.exists)).sum()
     df = df[df["image"].apply(os.path.exists)].reset_index(drop=True)
+
+    print(f"Using lesion-white image folder: {LESION_IMAGE_DIR}")
+    print(f"Found lesion-white images: {len(df)}")
+    print(f"Missing lesion-white images: {missing_lesion_images}")
+
+    if len(df) == 0:
+        raise FileNotFoundError(
+            "No lesion-white images found. Run create_ham10000_lesion_white_images.py first."
+        )
 
     labels = sorted(df["dx"].unique())
     label_feature = ClassLabel(names=labels)
@@ -404,7 +363,7 @@ def main():
         "model": "BasicCNN",
         "dataset": "HAM10000-lesion-white",
         "run_dir": RUN_DIR,
-        "mask_dir": MASK_DIR,
+        "lesion_image_dir": LESION_IMAGE_DIR,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "epochs": num_epochs,
