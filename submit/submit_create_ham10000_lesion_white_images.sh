@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=create_ham10000_lesion_white_images
-#SBATCH --output=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.out
-#SBATCH --error=/ocean/projects/mth250011p/troemer/skin-lesions/logs/%x-%j.err
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 #SBATCH -p RM-shared
 #SBATCH --account=mth250011p
 #SBATCH -N 1
@@ -14,6 +14,14 @@ set -euo pipefail
 
 REPO_DIR="/ocean/projects/mth250011p/troemer/skin-lesions"
 cd "$REPO_DIR"
+
+JOB_NAME="${SLURM_JOB_NAME:-$(basename "$0" .sh)}"
+JOB_ID="${SLURM_JOB_ID:-manual}"
+LOG_DIR="${REPO_DIR}/logs/${JOB_NAME}-${JOB_ID}"
+mkdir -p "$LOG_DIR"
+exec > "${LOG_DIR}/stdout.log" 2> "${LOG_DIR}/stderr.log"
+
+echo "Log directory: $LOG_DIR"
 echo "Job started on $(date)"
 echo "Running on node: $(hostname)"
 echo "Working directory: $(pwd)"
