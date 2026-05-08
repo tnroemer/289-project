@@ -288,6 +288,7 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     true_positive = 0
     false_positive = 0
     false_negative = 0
+    true_negative = 0
 
     for batch in loader:
         images = batch["pixel_values"].to(device, non_blocking=True)
@@ -309,15 +310,18 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
         true_positive += ((preds == 1) & (labels == 1)).sum().item()
         false_positive += ((preds == 1) & (labels == 0)).sum().item()
         false_negative += ((preds == 0) & (labels == 1)).sum().item()
+        true_negative += ((preds == 0) & (labels == 0)).sum().item()
         total += labels.size(0)
 
     avg_loss = total_loss / total
     accuracy = correct / total
     precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
     recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    balanced_accuracy = (recall + specificity) / 2
 
-    return avg_loss, accuracy, precision, recall, f1
+    return avg_loss, accuracy, precision, recall, specificity, f1, balanced_accuracy
 
 
 def evaluate(model, loader, criterion, device):
@@ -329,6 +333,7 @@ def evaluate(model, loader, criterion, device):
     true_positive = 0
     false_positive = 0
     false_negative = 0
+    true_negative = 0
 
     with torch.no_grad():
         for batch in loader:
@@ -346,15 +351,18 @@ def evaluate(model, loader, criterion, device):
             true_positive += ((preds == 1) & (labels == 1)).sum().item()
             false_positive += ((preds == 1) & (labels == 0)).sum().item()
             false_negative += ((preds == 0) & (labels == 1)).sum().item()
+            true_negative += ((preds == 0) & (labels == 0)).sum().item()
             total += labels.size(0)
 
     avg_loss = total_loss / total
     accuracy = correct / total
     precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
     recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    balanced_accuracy = (recall + specificity) / 2
 
-    return avg_loss, accuracy, precision, recall, f1
+    return avg_loss, accuracy, precision, recall, specificity, f1, balanced_accuracy
 
 
 def save_predictions(model, loader, criterion, device, labels, predictions_path, metrics_path):
@@ -411,6 +419,7 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
     recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
     specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    balanced_accuracy = (recall + specificity) / 2
 
     pred_df = pd.DataFrame(rows)
     pred_df.to_csv(predictions_path, index=False)
@@ -422,6 +431,7 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
         {"metric": "recall", "class": "malignant", "value": recall},
         {"metric": "specificity", "class": "benign", "value": specificity},
         {"metric": "f1", "class": "malignant", "value": f1},
+        {"metric": "balanced_accuracy", "class": "overall", "value": balanced_accuracy},
         {"metric": "num_examples", "class": "overall", "value": total},
         {"metric": "true_positive", "class": "malignant", "value": true_positive},
         {"metric": "false_positive", "class": "malignant", "value": false_positive},
@@ -436,10 +446,13 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
     print(f"Test Acc: {accuracy:.4f}")
     print(f"Test Precision: {precision:.4f}")
     print(f"Test Recall: {recall:.4f}")
+    print(f"Test Specificity: {specificity:.4f}")
+    print(f"Test F1: {f1:.4f}")
+    print(f"Test Balanced Acc: {balanced_accuracy:.4f}")
     print(f"Saved predictions to {predictions_path}")
     print(f"Saved metrics to {metrics_path}")
 
-    return avg_loss, accuracy, precision, recall, f1
+    return avg_loss, accuracy, precision, recall, specificity, f1, balanced_accuracy
 
 
 # -----------------------
@@ -526,7 +539,7 @@ def main():
     epochs_without_improvement = 0
 
     for epoch in range(num_epochs):
-        train_loss, train_acc, train_precision, train_recall, train_f1 = train_one_epoch(
+        train_loss, train_acc, train_precision, train_recall, train_specificity, train_f1, train_balanced_acc = train_one_epoch(
             model,
             train_loader,
             optimizer,
@@ -534,7 +547,7 @@ def main():
             device,
         )
 
-        val_loss, val_acc, val_precision, val_recall, val_f1 = evaluate(
+        val_loss, val_acc, val_precision, val_recall, val_specificity, val_f1, val_balanced_acc = evaluate(
             model,
             val_loader,
             criterion,
@@ -547,12 +560,16 @@ def main():
             "train/accuracy": train_acc,
             "train/precision": train_precision,
             "train/recall": train_recall,
+            "train/specificity": train_specificity,
             "train/f1": train_f1,
+            "train/balanced_accuracy": train_balanced_acc,
             "val/loss": val_loss,
             "val/accuracy": val_acc,
             "val/precision": val_precision,
             "val/recall": val_recall,
+            "val/specificity": val_specificity,
             "val/f1": val_f1,
+            "val/balanced_accuracy": val_balanced_acc,
         })
 
         print(
@@ -561,10 +578,14 @@ def main():
             f"Train Acc: {train_acc:.4f} | "
             f"Train Precision: {train_precision:.4f} | "
             f"Train Recall: {train_recall:.4f} | "
+            f"Train Specificity: {train_specificity:.4f} | "
+            f"Train F1: {train_f1:.4f} | "
             f"Val Loss: {val_loss:.4f} | "
             f"Val Acc: {val_acc:.4f} | "
             f"Val Precision: {val_precision:.4f} | "
-            f"Val Recall: {val_recall:.4f}"
+            f"Val Recall: {val_recall:.4f} | "
+            f"Val Specificity: {val_specificity:.4f} | "
+            f"Val F1: {val_f1:.4f}"
         )
 
         if val_f1 > best_val_f1:
@@ -578,7 +599,9 @@ def main():
                 "val_acc": val_acc,
                 "val_precision": val_precision,
                 "val_recall": val_recall,
+                "val_specificity": val_specificity,
                 "val_f1": val_f1,
+                "val_balanced_accuracy": val_balanced_acc,
                 "val_loss": val_loss,
                 "labels": labels,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
@@ -592,7 +615,9 @@ def main():
             wandb.run.summary["best_val_accuracy"] = val_acc
             wandb.run.summary["best_val_precision"] = val_precision
             wandb.run.summary["best_val_recall"] = val_recall
+            wandb.run.summary["best_val_specificity"] = val_specificity
             wandb.run.summary["best_epoch"] = epoch + 1
+            wandb.run.summary["best_val_balanced_accuracy"] = val_balanced_acc
 
             wandb.save(best_model_path)
 
@@ -607,7 +632,7 @@ def main():
     checkpoint = torch.load(best_model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    test_loss, test_acc, test_precision, test_recall, test_f1 = save_predictions(
+    test_loss, test_acc, test_precision, test_recall, test_specificity, test_f1, test_balanced_acc = save_predictions(
         model,
         val_loader,
         criterion,
@@ -622,13 +647,17 @@ def main():
         "test/accuracy": test_acc,
         "test/precision": test_precision,
         "test/recall": test_recall,
+        "test/specificity": test_specificity,
         "test/f1": test_f1,
+        "test/balanced_accuracy": test_balanced_acc,
     })
     wandb.run.summary["test_loss"] = test_loss
     wandb.run.summary["test_accuracy"] = test_acc
     wandb.run.summary["test_precision"] = test_precision
     wandb.run.summary["test_recall"] = test_recall
+    wandb.run.summary["test_specificity"] = test_specificity
     wandb.run.summary["test_f1"] = test_f1
+    wandb.run.summary["test_balanced_accuracy"] = test_balanced_acc
 
     wandb.finish()
 
