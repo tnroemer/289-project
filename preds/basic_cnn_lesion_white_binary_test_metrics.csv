@@ -1,0 +1,12 @@
+metric,class,value
+loss,overall,0.7799262252677636
+accuracy,overall,0.8002995506739891
+precision,malignant,0.4918032786885246
+recall,malignant,0.690537084398977
+specificity,benign,0.8269230769230769
+f1,malignant,0.574468085106383
+num_examples,overall,2003.0
+true_positive,malignant,270.0
+false_positive,malignant,279.0
+false_negative,malignant,121.0
+true_negative,benign,1333.0
