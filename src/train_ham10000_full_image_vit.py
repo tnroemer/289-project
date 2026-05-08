@@ -23,7 +23,9 @@ DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "skin-cancer-mnist-ham10000")
 IMAGE_DIR = os.path.join(DATASET_DIR, "HAM10000_images")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
-MODEL_NAME = "vit"
+MODEL_NAME = "vit_binary"
+MALIGNANT_LABELS = {"mel", "bcc", "akiec"}
+BINARY_LABELS = ["benign", "malignant"]
 
 image_size = 64
 batch_size = 32
@@ -78,7 +80,7 @@ def val_transforms(examples):
 def collate_fn(batch):
     output = {
         "pixel_values": torch.stack([x["pixel_values"] for x in batch]),
-        "labels": torch.tensor([x["label"] for x in batch], dtype=torch.long),
+        "labels": torch.tensor([x["label"] for x in batch], dtype=torch.float32),
     }
 
     if "image_id" in batch[0]:
@@ -247,10 +249,10 @@ def prepare_dataset():
     )
     df["image_path"] = df["image"]
 
-    labels = sorted(df["dx"].unique())
+    labels = BINARY_LABELS
     label_feature = ClassLabel(names=labels)
 
-    df["label"] = df["dx"].apply(lambda x: label_feature.str2int(x))
+    df["label"] = df["dx"].str.lower().isin(MALIGNANT_LABELS).astype(int)
 
     dataset = Dataset.from_pandas(df[["image_id", "image_path", "dx", "image", "label"]])
     dataset = dataset.cast_column("image", Image())
@@ -262,10 +264,15 @@ def prepare_dataset():
         seed=42,
     )
 
+    train_labels = splits["train"]["label"]
+    positive_count = sum(train_labels)
+    negative_count = len(train_labels) - positive_count
+    pos_weight = negative_count / positive_count
+
     train_ds = splits["train"].with_transform(train_transforms)
     val_ds = splits["test"].with_transform(val_transforms)
 
-    return train_ds, val_ds, labels
+    return train_ds, val_ds, labels, pos_weight
 
 
 # -----------------------
@@ -278,6 +285,9 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     total_loss = 0.0
     correct = 0
     total = 0
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
 
     for batch in loader:
         images = batch["pixel_values"].to(device, non_blocking=True)
@@ -285,7 +295,7 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
 
         optimizer.zero_grad(set_to_none=True)
 
-        outputs = model(images)
+        outputs = model(images).squeeze(1)
         loss = criterion(outputs, labels)
 
         loss.backward()
@@ -293,14 +303,21 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
 
         total_loss += loss.item() * images.size(0)
 
-        preds = outputs.argmax(dim=1)
+        probs = torch.sigmoid(outputs)
+        preds = (probs >= 0.5).float()
         correct += (preds == labels).sum().item()
+        true_positive += ((preds == 1) & (labels == 1)).sum().item()
+        false_positive += ((preds == 1) & (labels == 0)).sum().item()
+        false_negative += ((preds == 0) & (labels == 1)).sum().item()
         total += labels.size(0)
 
     avg_loss = total_loss / total
     accuracy = correct / total
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
-    return avg_loss, accuracy
+    return avg_loss, accuracy, precision, recall, f1
 
 
 def evaluate(model, loader, criterion, device):
@@ -309,25 +326,35 @@ def evaluate(model, loader, criterion, device):
     total_loss = 0.0
     correct = 0
     total = 0
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
 
     with torch.no_grad():
         for batch in loader:
             images = batch["pixel_values"].to(device, non_blocking=True)
             labels = batch["labels"].to(device, non_blocking=True)
 
-            outputs = model(images)
+            outputs = model(images).squeeze(1)
             loss = criterion(outputs, labels)
 
             total_loss += loss.item() * images.size(0)
 
-            preds = outputs.argmax(dim=1)
+            probs = torch.sigmoid(outputs)
+            preds = (probs >= 0.5).float()
             correct += (preds == labels).sum().item()
+            true_positive += ((preds == 1) & (labels == 1)).sum().item()
+            false_positive += ((preds == 1) & (labels == 0)).sum().item()
+            false_negative += ((preds == 0) & (labels == 1)).sum().item()
             total += labels.size(0)
 
     avg_loss = total_loss / total
     accuracy = correct / total
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
-    return avg_loss, accuracy
+    return avg_loss, accuracy, precision, recall, f1
 
 
 def save_predictions(model, loader, criterion, device, labels, predictions_path, metrics_path):
@@ -336,6 +363,10 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
     total_loss = 0.0
     correct = 0
     total = 0
+    true_positive = 0
+    false_positive = 0
+    false_negative = 0
+    true_negative = 0
     rows = []
 
     with torch.no_grad():
@@ -343,13 +374,17 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
             images = batch["pixel_values"].to(device, non_blocking=True)
             labels_batch = batch["labels"].to(device, non_blocking=True)
 
-            outputs = model(images)
+            outputs = model(images).squeeze(1)
             loss = criterion(outputs, labels_batch)
-            probs = torch.softmax(outputs, dim=1)
-            preds = outputs.argmax(dim=1)
+            probs = torch.sigmoid(outputs)
+            preds = (probs >= 0.5).float()
 
             total_loss += loss.item() * images.size(0)
             correct += (preds == labels_batch).sum().item()
+            true_positive += ((preds == 1) & (labels_batch == 1)).sum().item()
+            false_positive += ((preds == 1) & (labels_batch == 0)).sum().item()
+            false_negative += ((preds == 0) & (labels_batch == 1)).sum().item()
+            true_negative += ((preds == 0) & (labels_batch == 0)).sum().item()
             total += labels_batch.size(0)
 
             probs_cpu = probs.cpu()
@@ -364,16 +399,18 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
                     "true_dx": batch["dx"][i],
                     "pred_label": int(preds_cpu[i]),
                     "pred_dx": labels[int(preds_cpu[i])],
+                    "prob_malignant": float(probs_cpu[i]),
                     "correct": int(preds_cpu[i] == labels_cpu[i]),
                 }
-
-                for label_index, label_name in enumerate(labels):
-                    row[f"prob_{label_name}"] = float(probs_cpu[i, label_index])
 
                 rows.append(row)
 
     avg_loss = total_loss / total
     accuracy = correct / total
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     pred_df = pd.DataFrame(rows)
     pred_df.to_csv(predictions_path, index=False)
@@ -381,37 +418,28 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
     metrics_rows = [
         {"metric": "loss", "class": "overall", "value": avg_loss},
         {"metric": "accuracy", "class": "overall", "value": accuracy},
+        {"metric": "precision", "class": "malignant", "value": precision},
+        {"metric": "recall", "class": "malignant", "value": recall},
+        {"metric": "specificity", "class": "benign", "value": specificity},
+        {"metric": "f1", "class": "malignant", "value": f1},
         {"metric": "num_examples", "class": "overall", "value": total},
+        {"metric": "true_positive", "class": "malignant", "value": true_positive},
+        {"metric": "false_positive", "class": "malignant", "value": false_positive},
+        {"metric": "false_negative", "class": "malignant", "value": false_negative},
+        {"metric": "true_negative", "class": "benign", "value": true_negative},
     ]
-
-    for label_name in labels:
-        true_positive = ((pred_df["true_dx"] == label_name) & (pred_df["pred_dx"] == label_name)).sum()
-        false_positive = ((pred_df["true_dx"] != label_name) & (pred_df["pred_dx"] == label_name)).sum()
-        false_negative = ((pred_df["true_dx"] == label_name) & (pred_df["pred_dx"] != label_name)).sum()
-        true_negative = ((pred_df["true_dx"] != label_name) & (pred_df["pred_dx"] != label_name)).sum()
-
-        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-        specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
-
-        metrics_rows.extend([
-            {"metric": "support", "class": label_name, "value": true_positive + false_negative},
-            {"metric": "precision", "class": label_name, "value": precision},
-            {"metric": "recall", "class": label_name, "value": recall},
-            {"metric": "specificity", "class": label_name, "value": specificity},
-            {"metric": "f1", "class": label_name, "value": f1},
-        ])
 
     metrics_df = pd.DataFrame(metrics_rows)
     metrics_df.to_csv(metrics_path, index=False)
 
     print(f"Test Loss: {avg_loss:.4f}")
     print(f"Test Acc: {accuracy:.4f}")
+    print(f"Test Precision: {precision:.4f}")
+    print(f"Test Recall: {recall:.4f}")
     print(f"Saved predictions to {predictions_path}")
     print(f"Saved metrics to {metrics_path}")
 
-    return avg_loss, accuracy
+    return avg_loss, accuracy, precision, recall, f1
 
 
 # -----------------------
@@ -419,19 +447,20 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
 # -----------------------
 
 def main():
-    train_ds, val_ds, labels = prepare_dataset()
-
-    num_classes = len(labels)
+    train_ds, val_ds, labels, pos_weight = prepare_dataset()
 
     config = {
         "model": "ViT",
         "dataset": "HAM10000",
+        "target": "binary_malignant",
+        "malignant_labels": sorted(MALIGNANT_LABELS),
+        "pos_weight": pos_weight,
         "run_dir": RUN_DIR,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "epochs": num_epochs,
         "image_size": image_size,
-        "num_classes": num_classes,
+        "num_outputs": 1,
         "num_workers": num_workers,
         "patch_size": 8,
         "embed_dim": 128,
@@ -470,13 +499,15 @@ def main():
     run = wandb.init(
         entity="tnroemer-berk",
         project="skin-cancer-cnn",
-        name="vit",
+        name="vit-binary",
         config=config,
     )
 
-    model = BasicVIT(num_classes=num_classes).to(device)
+    model = BasicVIT(num_classes=1).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss(
+        pos_weight=torch.tensor([pos_weight], dtype=torch.float32, device=device)
+    )
     optimizer = AdamW(model.parameters(), 
                       lr=learning_rate,
                       weight_decay=0.05)
@@ -490,12 +521,12 @@ def main():
     predictions_path = os.path.join(PRED_DIR, f"{MODEL_NAME}_test_predictions.csv")
     metrics_path = os.path.join(PRED_DIR, f"{MODEL_NAME}_test_metrics.csv")
 
-    best_val_acc = -1.0
+    best_val_f1 = -1.0
     patience = 8
     epochs_without_improvement = 0
 
     for epoch in range(num_epochs):
-        train_loss, train_acc = train_one_epoch(
+        train_loss, train_acc, train_precision, train_recall, train_f1 = train_one_epoch(
             model,
             train_loader,
             optimizer,
@@ -503,7 +534,7 @@ def main():
             device,
         )
 
-        val_loss, val_acc = evaluate(
+        val_loss, val_acc, val_precision, val_recall, val_f1 = evaluate(
             model,
             val_loader,
             criterion,
@@ -514,20 +545,30 @@ def main():
             "epoch": epoch + 1,
             "train/loss": train_loss,
             "train/accuracy": train_acc,
+            "train/precision": train_precision,
+            "train/recall": train_recall,
+            "train/f1": train_f1,
             "val/loss": val_loss,
             "val/accuracy": val_acc,
+            "val/precision": val_precision,
+            "val/recall": val_recall,
+            "val/f1": val_f1,
         })
 
         print(
             f"Epoch {epoch + 1}/{num_epochs} | "
             f"Train Loss: {train_loss:.4f} | "
             f"Train Acc: {train_acc:.4f} | "
+            f"Train Precision: {train_precision:.4f} | "
+            f"Train Recall: {train_recall:.4f} | "
             f"Val Loss: {val_loss:.4f} | "
-            f"Val Acc: {val_acc:.4f}"
+            f"Val Acc: {val_acc:.4f} | "
+            f"Val Precision: {val_precision:.4f} | "
+            f"Val Recall: {val_recall:.4f}"
         )
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
+        if val_f1 > best_val_f1:
+            best_val_f1 = val_f1
             epochs_without_improvement = 0
 
             checkpoint = {
@@ -535,19 +576,27 @@ def main():
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_acc": val_acc,
+                "val_precision": val_precision,
+                "val_recall": val_recall,
+                "val_f1": val_f1,
                 "val_loss": val_loss,
                 "labels": labels,
+                "malignant_labels": sorted(MALIGNANT_LABELS),
+                "pos_weight": pos_weight,
                 "config": config,
             }
 
             torch.save(checkpoint, best_model_path)
 
-            wandb.run.summary["best_val_accuracy"] = best_val_acc
+            wandb.run.summary["best_val_f1"] = best_val_f1
+            wandb.run.summary["best_val_accuracy"] = val_acc
+            wandb.run.summary["best_val_precision"] = val_precision
+            wandb.run.summary["best_val_recall"] = val_recall
             wandb.run.summary["best_epoch"] = epoch + 1
 
             wandb.save(best_model_path)
 
-            print(f"Saved new best model: val_acc={val_acc:.4f}")
+            print(f"Saved new best model: val_f1={val_f1:.4f}")
         else:
             epochs_without_improvement += 1
         
@@ -558,7 +607,7 @@ def main():
     checkpoint = torch.load(best_model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    test_loss, test_acc = save_predictions(
+    test_loss, test_acc, test_precision, test_recall, test_f1 = save_predictions(
         model,
         val_loader,
         criterion,
@@ -571,9 +620,15 @@ def main():
     wandb.log({
         "test/loss": test_loss,
         "test/accuracy": test_acc,
+        "test/precision": test_precision,
+        "test/recall": test_recall,
+        "test/f1": test_f1,
     })
     wandb.run.summary["test_loss"] = test_loss
     wandb.run.summary["test_accuracy"] = test_acc
+    wandb.run.summary["test_precision"] = test_precision
+    wandb.run.summary["test_recall"] = test_recall
+    wandb.run.summary["test_f1"] = test_f1
 
     wandb.finish()
 

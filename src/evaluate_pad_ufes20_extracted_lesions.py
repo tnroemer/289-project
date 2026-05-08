@@ -24,18 +24,17 @@ PRED_DIR = os.path.join(RUN_DIR, "preds")
 batch_size = 32
 num_workers = 4
 
-PAD_MALIGNANT_LABELS = {"bcc", "mel", "scc", "bod"}
-HAM_MALIGNANT_LABELS = {"akiec", "bcc", "mel"}
+PAD_MALIGNANT_LABELS = {"bcc", "mel", "ack", "scc"}
 
 MODEL_SPECS = [
     {
-        "name": "basic_cnn_lesion_white",
-        "path": os.path.join(MODEL_DIR, "basic_cnn_lesion_white_best.pt"),
+        "name": "basic_cnn_lesion_white_binary",
+        "path": os.path.join(MODEL_DIR, "basic_cnn_lesion_white_binary_best.pt"),
         "type": "cnn",
     },
     {
-        "name": "vit_lesion_white",
-        "path": os.path.join(MODEL_DIR, "vit_lesion_white_best.pt"),
+        "name": "vit_lesion_white_binary",
+        "path": os.path.join(MODEL_DIR, "vit_lesion_white_binary_best.pt"),
         "type": "vit",
     },
 ]
@@ -189,15 +188,15 @@ def load_checkpoint(path, device):
         return torch.load(path, map_location=device)
 
 
-def build_model(model_type, checkpoint, num_classes):
+def build_model(model_type, checkpoint, num_outputs):
     config = checkpoint.get("config", {})
 
     if model_type == "cnn":
-        return BasicCNN(num_classes=num_classes)
+        return BasicCNN(num_classes=num_outputs)
 
     if model_type == "vit":
         return BasicVIT(
-            num_classes=num_classes,
+            num_classes=num_outputs,
             image_size=config.get("image_size", 64),
             patch_size=config.get("patch_size", 8),
             embed_dim=config.get("embed_dim", 128),
@@ -223,10 +222,6 @@ def make_transform(image_size):
 
 def is_pad_malignant(label):
     return str(label).lower() in PAD_MALIGNANT_LABELS
-
-
-def is_ham_malignant(label):
-    return str(label).lower() in HAM_MALIGNANT_LABELS
 
 
 def save_metrics(pred_df, metrics_path):
@@ -280,7 +275,7 @@ def evaluate_model(model_spec, manifest_df, device):
     config = checkpoint.get("config", {})
     image_size = config.get("image_size", 128 if model_spec["type"] == "cnn" else 64)
 
-    model = build_model(model_spec["type"], checkpoint, num_classes=len(labels))
+    model = build_model(model_spec["type"], checkpoint, num_outputs=1)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
@@ -300,15 +295,16 @@ def evaluate_model(model_spec, manifest_df, device):
     with torch.no_grad():
         for batch in loader:
             images = batch["pixel_values"].to(device, non_blocking=True)
-            outputs = model(images)
-            probs = torch.softmax(outputs, dim=1)
-            preds = outputs.argmax(dim=1)
+            logits = model(images).squeeze(1)
+            probs = torch.sigmoid(logits)
+            preds = (probs >= 0.5).long()
 
             probs_cpu = probs.cpu()
             preds_cpu = preds.cpu()
 
             for i in range(images.size(0)):
-                pred_label = labels[int(preds_cpu[i])]
+                pred_malignant = int(preds_cpu[i])
+                pred_label = labels[pred_malignant]
                 true_label = batch["diagnostic"][i]
 
                 row = {
@@ -316,13 +312,11 @@ def evaluate_model(model_spec, manifest_df, device):
                     "extracted_image_path": batch["extracted_image_path"][i],
                     "diagnostic": true_label,
                     "true_malignant": int(is_pad_malignant(true_label)),
-                    "pred_label": int(preds_cpu[i]),
+                    "pred_label": pred_malignant,
                     "pred_dx": pred_label,
-                    "pred_malignant": int(is_ham_malignant(pred_label)),
+                    "pred_malignant": pred_malignant,
+                    "prob_malignant": float(probs_cpu[i]),
                 }
-
-                for label_index, label_name in enumerate(labels):
-                    row[f"prob_{label_name}"] = float(probs_cpu[i, label_index])
 
                 rows.append(row)
 
