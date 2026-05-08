@@ -287,12 +287,29 @@ def prepare_full_image_df():
 
 def prepare_extracted_lesion_df():
     if not os.path.exists(EXTRACTED_MANIFEST_PATH):
-        raise FileNotFoundError(
-            "Could not find extracted PAD-UFES-20 lesion manifest. "
-            "Run create_pad_ufes20_extracted_lesions.py first."
-        )
+        print(f"Missing extracted lesion manifest: {EXTRACTED_MANIFEST_PATH}")
+        print("Trying to rebuild it from existing extracted PAD-UFES-20 images.")
 
-    df = pd.read_csv(EXTRACTED_MANIFEST_PATH)
+        df = prepare_full_image_df()
+        df["original_image_path"] = df["image_path"]
+        df["extracted_image_path"] = df["img_id"].apply(
+            lambda x: os.path.join(EXTRACTED_DIR, os.path.splitext(str(x))[0] + ".png")
+        )
+        df = df[df["extracted_image_path"].apply(os.path.exists)].reset_index(drop=True)
+
+        if len(df) == 0:
+            raise FileNotFoundError(
+                "Could not find extracted PAD-UFES-20 lesion images. "
+                "Run `sbatch submit/submit_create_pad_ufes20_extracted_lesions.sh` first, "
+                "then rerun this evaluation job."
+            )
+
+        os.makedirs(EXTRACTED_DIR, exist_ok=True)
+        df.to_csv(EXTRACTED_MANIFEST_PATH, index=False)
+        print(f"Rebuilt extracted lesion manifest: {EXTRACTED_MANIFEST_PATH}")
+    else:
+        df = pd.read_csv(EXTRACTED_MANIFEST_PATH)
+
     df["image_path"] = df["extracted_image_path"]
     return df
 
