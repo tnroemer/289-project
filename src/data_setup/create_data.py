@@ -341,9 +341,40 @@ def create_pad_ufes20_data():
         rows.append(output_row)
 
     manifest_df = pd.DataFrame(rows)
+    manifest_df["dx"] = manifest_df["common_label"].str.lower()
     manifest_df.to_csv(PAD_METADATA_PATH, index=False)
 
-    print("Created PAD-UFES-20 common-label image folder")
+    train_parts = []
+    val_parts = []
+    test_parts = []
+
+    for _, group in manifest_df.groupby("label"):
+        train_df, val_df, test_df = split_group(group)
+        train_parts.append(train_df)
+        val_parts.append(val_df)
+        test_parts.append(test_df)
+
+    train_df = pd.concat(train_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
+    val_df = pd.concat(val_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
+    test_df = pd.concat(test_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    train_df["split"] = "train"
+    val_df["split"] = "val"
+    test_df["split"] = "test"
+
+    os.makedirs(HAM_SPLIT_DIR, exist_ok=True)
+
+    train_path = os.path.join(HAM_SPLIT_DIR, "pad_ufes20_train.csv")
+    val_path = os.path.join(HAM_SPLIT_DIR, "pad_ufes20_val.csv")
+    test_path = os.path.join(HAM_SPLIT_DIR, "pad_ufes20_test.csv")
+    all_path = os.path.join(HAM_SPLIT_DIR, "pad_ufes20_all.csv")
+
+    train_df.to_csv(train_path, index=False)
+    val_df.to_csv(val_path, index=False)
+    test_df.to_csv(test_path, index=False)
+    pd.concat([train_df, val_df, test_df]).to_csv(all_path, index=False)
+
+    print("Created PAD-UFES-20 common-label image folder and splits")
     print(f"Metadata path: {metadata_path}")
     print(f"Common HAM/PAD labels: {COMMON_LABELS}")
     print("PAD mapping:", PAD_TO_HAM_LABELS)
@@ -352,8 +383,17 @@ def create_pad_ufes20_data():
     print(f"Missing PAD source images: {missing_images}")
     print("PAD counts:")
     print(manifest_df["common_label"].value_counts().sort_index())
+    print("Train counts:")
+    print(train_df["common_label"].value_counts().sort_index())
+    print("Val counts:")
+    print(val_df["common_label"].value_counts().sort_index())
+    print("Test counts:")
+    print(test_df["common_label"].value_counts().sort_index())
     print(f"Output folder: {PAD_IMAGE_DIR}")
     print(f"Saved PAD metadata: {PAD_METADATA_PATH}")
+    print(f"Saved train split to {train_path}")
+    print(f"Saved val split to {val_path}")
+    print(f"Saved test split to {test_path}")
 
 
 def main():

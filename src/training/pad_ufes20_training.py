@@ -34,72 +34,41 @@ RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
-PAD_METADATA_PATH = os.path.join(RUN_DIR, "data", "pad-ufes-20-images", "metadata.csv")
 
 image_size = 128
 learning_rate = 3e-4
 
 
-def split_group(group):
-    group = group.sample(frac=1, random_state=seed).reset_index(drop=True)
+def load_pad_split(split_name):
+    split_path = os.path.join(SPLIT_DIR, f"pad_ufes20_{split_name}.csv")
 
-    n = len(group)
-    n_test = max(1, round(n * 0.15))
-    n_val = max(1, round(n * 0.15))
-
-    test_df = group.iloc[:n_test]
-    val_df = group.iloc[n_test:n_test + n_val]
-    train_df = group.iloc[n_test + n_val:]
-
-    return train_df, val_df, test_df
-
-
-def prepare_pad_splits():
-    if not os.path.exists(PAD_METADATA_PATH):
+    if not os.path.exists(split_path):
         raise FileNotFoundError(
-            f"Missing prepared PAD-UFES-20 metadata: {PAD_METADATA_PATH}. "
+            f"Missing PAD-UFES-20 split file: {split_path}. "
             "Run `sbatch submit/submit_create_data.sh` first."
         )
 
-    df = pd.read_csv(PAD_METADATA_PATH)
-    df = df.dropna(subset=["image_path", "common_label"]).copy().reset_index(drop=True)
-    df = df[df["image_path"].apply(os.path.exists)].reset_index(drop=True)
-    df["dx"] = df["common_label"].str.lower()
-    df = df[df["dx"].isin(COMMON_LABELS)].copy().reset_index(drop=True)
+    df = pd.read_csv(split_path)
 
-    label_to_id = {label: i for i, label in enumerate(COMMON_LABELS)}
-    df["label"] = df["dx"].map(label_to_id)
-    df["image_id"] = df["image_id"].astype(str)
+    if "dx" not in df.columns:
+        df["dx"] = df["common_label"].str.lower()
+
+    missing_images = (~df["image_path"].apply(os.path.exists)).sum()
+    df = df[df["image_path"].apply(os.path.exists)].reset_index(drop=True)
+
+    print(f"{split_name} examples found: {len(df)}")
+    print(f"{split_name} missing images: {missing_images}")
 
     if len(df) == 0:
-        raise FileNotFoundError("No prepared PAD-UFES-20 full images found.")
+        raise FileNotFoundError(f"No PAD-UFES-20 images found for split {split_name}.")
 
-    train_parts = []
-    val_parts = []
-    test_parts = []
+    return df
 
-    for _, group in df.groupby("label"):
-        train_df, val_df, test_df = split_group(group)
-        train_parts.append(train_df)
-        val_parts.append(val_df)
-        test_parts.append(test_df)
 
-    train_df = pd.concat(train_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
-    val_df = pd.concat(val_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
-    test_df = pd.concat(test_parts).sample(frac=1, random_state=seed).reset_index(drop=True)
-
-    train_df["split"] = "train"
-    val_df["split"] = "val"
-    test_df["split"] = "test"
-
-    os.makedirs(SPLIT_DIR, exist_ok=True)
-    train_df.to_csv(os.path.join(SPLIT_DIR, "pad_ufes20_train.csv"), index=False)
-    val_df.to_csv(os.path.join(SPLIT_DIR, "pad_ufes20_val.csv"), index=False)
-    test_df.to_csv(os.path.join(SPLIT_DIR, "pad_ufes20_test.csv"), index=False)
-    pd.concat([train_df, val_df, test_df]).to_csv(
-        os.path.join(SPLIT_DIR, "pad_ufes20_all.csv"),
-        index=False,
-    )
+def load_pad_splits():
+    train_df = load_pad_split("train")
+    val_df = load_pad_split("val")
+    test_df = load_pad_split("test")
 
     return train_df, val_df, test_df
 
@@ -107,7 +76,7 @@ def prepare_pad_splits():
 def train_pad_ufes20_full_image_resnet():
     torch.manual_seed(seed)
 
-    train_df, val_df, test_df = prepare_pad_splits()
+    train_df, val_df, test_df = load_pad_splits()
     train_transform, val_transform = make_transforms(image_size)
 
     train_ds = SkinLesionDataset(train_df, train_transform)

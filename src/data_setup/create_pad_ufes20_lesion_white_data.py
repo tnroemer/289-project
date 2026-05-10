@@ -22,72 +22,60 @@ segmentation_image_size = 256
 mask_threshold = 0.5
 
 
-class DoubleConv(nn.Module):
+class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
-        self.conv = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
-        return self.conv(x)
+        return self.net(x)
 
 
 class UNet(nn.Module):
     def __init__(self, in_channels=3, out_channels=1, base_channels=32):
         super().__init__()
 
-        self.enc1 = DoubleConv(in_channels, base_channels)
-        self.pool1 = nn.MaxPool2d(2)
-        self.enc2 = DoubleConv(base_channels, base_channels * 2)
-        self.pool2 = nn.MaxPool2d(2)
-        self.enc3 = DoubleConv(base_channels * 2, base_channels * 4)
-        self.pool3 = nn.MaxPool2d(2)
-        self.enc4 = DoubleConv(base_channels * 4, base_channels * 8)
-        self.pool4 = nn.MaxPool2d(2)
+        self.down1 = ConvBlock(in_channels, base_channels)
+        self.down2 = ConvBlock(base_channels, base_channels * 2)
+        self.down3 = ConvBlock(base_channels * 2, base_channels * 4)
+        self.bottleneck = ConvBlock(base_channels * 4, base_channels * 8)
 
-        self.bottleneck = DoubleConv(base_channels * 8, base_channels * 16)
-
-        self.up4 = nn.ConvTranspose2d(base_channels * 16, base_channels * 8, kernel_size=2, stride=2)
-        self.dec4 = DoubleConv(base_channels * 16, base_channels * 8)
+        self.pool = nn.MaxPool2d(2)
         self.up3 = nn.ConvTranspose2d(base_channels * 8, base_channels * 4, kernel_size=2, stride=2)
-        self.dec3 = DoubleConv(base_channels * 8, base_channels * 4)
+        self.conv3 = ConvBlock(base_channels * 8, base_channels * 4)
         self.up2 = nn.ConvTranspose2d(base_channels * 4, base_channels * 2, kernel_size=2, stride=2)
-        self.dec2 = DoubleConv(base_channels * 4, base_channels * 2)
+        self.conv2 = ConvBlock(base_channels * 4, base_channels * 2)
         self.up1 = nn.ConvTranspose2d(base_channels * 2, base_channels, kernel_size=2, stride=2)
-        self.dec1 = DoubleConv(base_channels * 2, base_channels)
-
-        self.final_conv = nn.Conv2d(base_channels, out_channels, kernel_size=1)
+        self.conv1 = ConvBlock(base_channels * 2, base_channels)
+        self.out = nn.Conv2d(base_channels, out_channels, kernel_size=1)
 
     def forward(self, x):
-        enc1 = self.enc1(x)
-        enc2 = self.enc2(self.pool1(enc1))
-        enc3 = self.enc3(self.pool2(enc2))
-        enc4 = self.enc4(self.pool3(enc3))
+        down1 = self.down1(x)
+        down2 = self.down2(self.pool(down1))
+        down3 = self.down3(self.pool(down2))
+        bottleneck = self.bottleneck(self.pool(down3))
 
-        bottleneck = self.bottleneck(self.pool4(enc4))
+        x = self.up3(bottleneck)
+        x = torch.cat((x, down3), dim=1)
+        x = self.conv3(x)
 
-        dec4 = self.up4(bottleneck)
-        dec4 = torch.cat((dec4, enc4), dim=1)
-        dec4 = self.dec4(dec4)
+        x = self.up2(x)
+        x = torch.cat((x, down2), dim=1)
+        x = self.conv2(x)
 
-        dec3 = self.up3(dec4)
-        dec3 = torch.cat((dec3, enc3), dim=1)
-        dec3 = self.dec3(dec3)
+        x = self.up1(x)
+        x = torch.cat((x, down1), dim=1)
+        x = self.conv1(x)
 
-        dec2 = self.up2(dec3)
-        dec2 = torch.cat((dec2, enc2), dim=1)
-        dec2 = self.dec2(dec2)
-
-        dec1 = self.up1(dec2)
-        dec1 = torch.cat((dec1, enc1), dim=1)
-        dec1 = self.dec1(dec1)
-
-        return self.final_conv(dec1)
+        return self.out(x)
 
 
 def clean_state_dict(state_dict):
@@ -135,7 +123,11 @@ def load_segmentation_model(device):
     if "base_channels" in config:
         base_channels_to_try.append(config["base_channels"])
 
+    if "down1.net.0.weight" in state_dict:
+        base_channels_to_try.append(state_dict["down1.net.0.weight"].shape[0])
+
     base_channels_to_try.extend([32, 64, 16])
+    base_channels_to_try = list(dict.fromkeys(base_channels_to_try))
 
     last_error = None
     for base_channels in base_channels_to_try:
