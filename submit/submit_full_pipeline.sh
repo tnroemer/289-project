@@ -1,9 +1,30 @@
 #!/bin/bash
+#SBATCH --job-name=submit_full_pipeline
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
+#SBATCH -p RM-shared
+#SBATCH -N 1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=1900M
+#SBATCH --account=mth250011p
+#SBATCH --time=00:10:00
 
 set -euo pipefail
 
 REPO_DIR="/ocean/projects/mth250011p/troemer/skin-lesions"
 cd "$REPO_DIR"
+
+JOB_NAME="${SLURM_JOB_NAME:-$(basename "$0" .sh)}"
+JOB_ID="${SLURM_JOB_ID:-manual}"
+LOG_DIR="${REPO_DIR}/logs/${JOB_NAME}-${JOB_ID}"
+mkdir -p "$LOG_DIR"
+exec > "${LOG_DIR}/stdout.log" 2> "${LOG_DIR}/stderr.log"
+
+echo "Log directory: $LOG_DIR"
+echo "Pipeline submitter started on $(date)"
+echo "Running on node: $(hostname)"
+echo "Working directory: $(pwd)"
 
 submit_job() {
     sbatch --parsable "$@"
@@ -46,3 +67,4 @@ echo "evaluate_pad_ufes20_lesion_white_models after all training jobs: $lesion_e
 
 echo "Pipeline submitted."
 echo "Slurm dependencies enforce: create data -> create lesion-white data -> train models -> evaluate PAD-UFES-20."
+echo "Pipeline submitter finished on $(date)"
