@@ -210,10 +210,14 @@ def train_pad_ufes20_full_image_resnet():
                 "val_macro_recall": val_metrics["macro_recall"],
                 "val_macro_f1": val_metrics["macro_f1"],
                 "val_balanced_accuracy": val_metrics["balanced_accuracy"],
+                "val_binary_accuracy": val_metrics["binary_accuracy"],
+                "val_binary_macro_f1": val_metrics["binary_macro_f1"],
+                "val_binary_balanced_accuracy": val_metrics["binary_balanced_accuracy"],
                 "val_malignant_precision": val_metrics["malignant_precision"],
                 "val_malignant_recall": val_metrics["malignant_recall"],
                 "val_malignant_specificity": val_metrics["malignant_specificity"],
                 "val_malignant_f1": val_metrics["malignant_f1"],
+                "val_benign_recall": val_metrics["benign_recall"],
                 "config": config,
             }
 
@@ -223,8 +227,12 @@ def train_pad_ufes20_full_image_resnet():
             wandb.run.summary["best_val_macro_f1"] = val_metrics["macro_f1"]
             wandb.run.summary["best_val_accuracy"] = val_metrics["accuracy"]
             wandb.run.summary["best_val_balanced_accuracy"] = val_metrics["balanced_accuracy"]
+            wandb.run.summary["best_val_binary_accuracy"] = val_metrics["binary_accuracy"]
+            wandb.run.summary["best_val_binary_macro_f1"] = val_metrics["binary_macro_f1"]
+            wandb.run.summary["best_val_binary_balanced_accuracy"] = val_metrics["binary_balanced_accuracy"]
             wandb.run.summary["best_val_malignant_recall"] = val_metrics["malignant_recall"]
             wandb.run.summary["best_val_malignant_specificity"] = val_metrics["malignant_specificity"]
+            wandb.run.summary["best_val_benign_recall"] = val_metrics["benign_recall"]
 
             wandb.save(best_model_path)
 
@@ -254,7 +262,11 @@ def train_pad_ufes20_full_image_resnet():
     wandb.run.summary["test_accuracy"] = test_metrics["accuracy"]
     wandb.run.summary["test_macro_f1"] = test_metrics["macro_f1"]
     wandb.run.summary["test_balanced_accuracy"] = test_metrics["balanced_accuracy"]
+    wandb.run.summary["test_binary_accuracy"] = test_metrics["binary_accuracy"]
+    wandb.run.summary["test_binary_macro_f1"] = test_metrics["binary_macro_f1"]
+    wandb.run.summary["test_binary_balanced_accuracy"] = test_metrics["binary_balanced_accuracy"]
     wandb.run.summary["test_malignant_recall"] = test_metrics["malignant_recall"]
     wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
+    wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
 
     wandb.finish()
