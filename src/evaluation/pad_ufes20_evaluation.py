@@ -118,6 +118,7 @@ def compute_metrics(targets, preds, labels):
     false_negative = sum(int(t and (not p)) for t, p in zip(true_malignant, pred_malignant))
     true_negative = sum(int((not t) and (not p)) for t, p in zip(true_malignant, pred_malignant))
 
+    binary_accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
     malignant_precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
     malignant_recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
     malignant_specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
@@ -126,20 +127,42 @@ def compute_metrics(targets, preds, labels):
         if malignant_precision + malignant_recall > 0
         else 0.0
     )
+    benign_precision = true_negative / (true_negative + false_negative) if true_negative + false_negative > 0 else 0.0
+    benign_recall = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    benign_specificity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    benign_f1 = (
+        2 * benign_precision * benign_recall / (benign_precision + benign_recall)
+        if benign_precision + benign_recall > 0
+        else 0.0
+    )
+    binary_macro_precision = (malignant_precision + benign_precision) / 2
+    binary_macro_recall = (malignant_recall + benign_recall) / 2
+    binary_macro_f1 = (malignant_f1 + benign_f1) / 2
 
     rows.extend([
         {"metric": "macro_precision", "class": "overall", "value": sum(precisions) / num_classes},
         {"metric": "macro_recall", "class": "overall", "value": sum(recalls) / num_classes},
         {"metric": "macro_f1", "class": "overall", "value": sum(f1s) / num_classes},
         {"metric": "balanced_accuracy", "class": "overall", "value": sum(recalls) / num_classes},
+        {"metric": "binary_accuracy", "class": "overall", "value": binary_accuracy},
+        {"metric": "binary_macro_precision", "class": "overall", "value": binary_macro_precision},
+        {"metric": "binary_macro_recall", "class": "overall", "value": binary_macro_recall},
+        {"metric": "binary_macro_f1", "class": "overall", "value": binary_macro_f1},
+        {"metric": "binary_balanced_accuracy", "class": "overall", "value": binary_macro_recall},
         {"metric": "malignant_precision", "class": "malignant", "value": malignant_precision},
         {"metric": "malignant_recall", "class": "malignant", "value": malignant_recall},
         {"metric": "malignant_specificity", "class": "benign", "value": malignant_specificity},
         {"metric": "malignant_f1", "class": "malignant", "value": malignant_f1},
-        {"metric": "true_positive", "class": "malignant", "value": true_positive},
-        {"metric": "false_positive", "class": "malignant", "value": false_positive},
-        {"metric": "false_negative", "class": "malignant", "value": false_negative},
-        {"metric": "true_negative", "class": "benign", "value": true_negative},
+        {"metric": "benign_precision", "class": "benign", "value": benign_precision},
+        {"metric": "benign_recall", "class": "benign", "value": benign_recall},
+        {"metric": "benign_specificity", "class": "malignant", "value": benign_specificity},
+        {"metric": "benign_f1", "class": "benign", "value": benign_f1},
+        {"metric": "binary_true_positive", "class": "malignant", "value": true_positive},
+        {"metric": "binary_false_positive", "class": "malignant", "value": false_positive},
+        {"metric": "binary_false_negative", "class": "malignant", "value": false_negative},
+        {"metric": "binary_true_negative", "class": "benign", "value": true_negative},
+        {"metric": "support", "class": "malignant", "value": true_positive + false_negative},
+        {"metric": "support", "class": "benign", "value": true_negative + false_positive},
     ])
 
     for true_index, true_label in enumerate(labels):
@@ -279,7 +302,10 @@ def evaluate_model(model_spec, df, source_name, device):
                     "pred_label": pred_index,
                     "pred_dx": labels[pred_index],
                     "correct": int(pred_index == true_index),
+                    "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
+                    "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
                 }
+                row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
 
                 for j, label in enumerate(labels):
                     row[f"prob_{label}"] = float(probs_cpu[i, j])

@@ -252,6 +252,7 @@ def compute_metrics(targets, preds, labels):
     false_negative = sum(int(t and (not p)) for t, p in zip(true_malignant, pred_malignant))
     true_negative = sum(int((not t) and (not p)) for t, p in zip(true_malignant, pred_malignant))
 
+    binary_accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
     malignant_precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
     malignant_recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
     malignant_specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
@@ -260,6 +261,17 @@ def compute_metrics(targets, preds, labels):
         if malignant_precision + malignant_recall > 0
         else 0.0
     )
+    benign_precision = true_negative / (true_negative + false_negative) if true_negative + false_negative > 0 else 0.0
+    benign_recall = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    benign_specificity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    benign_f1 = (
+        2 * benign_precision * benign_recall / (benign_precision + benign_recall)
+        if benign_precision + benign_recall > 0
+        else 0.0
+    )
+    binary_macro_precision = (malignant_precision + benign_precision) / 2
+    binary_macro_recall = (malignant_recall + benign_recall) / 2
+    binary_macro_f1 = (malignant_f1 + benign_f1) / 2
 
     confusion = {}
     for true_index, true_label in enumerate(labels):
@@ -275,10 +287,25 @@ def compute_metrics(targets, preds, labels):
         "macro_recall": sum(recalls) / num_classes,
         "macro_f1": sum(f1s) / num_classes,
         "balanced_accuracy": sum(recalls) / num_classes,
+        "binary_accuracy": binary_accuracy,
+        "binary_macro_precision": binary_macro_precision,
+        "binary_macro_recall": binary_macro_recall,
+        "binary_macro_f1": binary_macro_f1,
+        "binary_balanced_accuracy": binary_macro_recall,
         "malignant_precision": malignant_precision,
         "malignant_recall": malignant_recall,
         "malignant_specificity": malignant_specificity,
         "malignant_f1": malignant_f1,
+        "benign_precision": benign_precision,
+        "benign_recall": benign_recall,
+        "benign_specificity": benign_specificity,
+        "benign_f1": benign_f1,
+        "binary_true_positive": true_positive,
+        "binary_false_positive": false_positive,
+        "binary_false_negative": false_negative,
+        "binary_true_negative": true_negative,
+        "malignant_support": true_positive + false_negative,
+        "benign_support": true_negative + false_positive,
         "num_examples": total,
         "per_class": per_class,
         "confusion": confusion,
@@ -354,10 +381,25 @@ def write_metrics_csv(metrics, labels, metrics_path):
         {"metric": "macro_recall", "class": "overall", "value": metrics["macro_recall"]},
         {"metric": "macro_f1", "class": "overall", "value": metrics["macro_f1"]},
         {"metric": "balanced_accuracy", "class": "overall", "value": metrics["balanced_accuracy"]},
+        {"metric": "binary_accuracy", "class": "overall", "value": metrics["binary_accuracy"]},
+        {"metric": "binary_macro_precision", "class": "overall", "value": metrics["binary_macro_precision"]},
+        {"metric": "binary_macro_recall", "class": "overall", "value": metrics["binary_macro_recall"]},
+        {"metric": "binary_macro_f1", "class": "overall", "value": metrics["binary_macro_f1"]},
+        {"metric": "binary_balanced_accuracy", "class": "overall", "value": metrics["binary_balanced_accuracy"]},
         {"metric": "malignant_precision", "class": "malignant", "value": metrics["malignant_precision"]},
         {"metric": "malignant_recall", "class": "malignant", "value": metrics["malignant_recall"]},
         {"metric": "malignant_specificity", "class": "benign", "value": metrics["malignant_specificity"]},
         {"metric": "malignant_f1", "class": "malignant", "value": metrics["malignant_f1"]},
+        {"metric": "benign_precision", "class": "benign", "value": metrics["benign_precision"]},
+        {"metric": "benign_recall", "class": "benign", "value": metrics["benign_recall"]},
+        {"metric": "benign_specificity", "class": "malignant", "value": metrics["benign_specificity"]},
+        {"metric": "benign_f1", "class": "benign", "value": metrics["benign_f1"]},
+        {"metric": "binary_true_positive", "class": "malignant", "value": metrics["binary_true_positive"]},
+        {"metric": "binary_false_positive", "class": "malignant", "value": metrics["binary_false_positive"]},
+        {"metric": "binary_false_negative", "class": "malignant", "value": metrics["binary_false_negative"]},
+        {"metric": "binary_true_negative", "class": "benign", "value": metrics["binary_true_negative"]},
+        {"metric": "support", "class": "malignant", "value": metrics["malignant_support"]},
+        {"metric": "support", "class": "benign", "value": metrics["benign_support"]},
         {"metric": "num_examples", "class": "overall", "value": metrics["num_examples"]},
     ]
 
@@ -412,7 +454,10 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
                     "pred_label": pred_index,
                     "pred_dx": labels[pred_index],
                     "correct": int(pred_index == true_index),
+                    "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
+                    "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
                 }
+                row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
 
                 for j, label in enumerate(labels):
                     row[f"prob_{label}"] = float(probs_cpu[i, j])
@@ -429,6 +474,8 @@ def save_predictions(model, loader, criterion, device, labels, predictions_path,
     print(f"Test Accuracy: {metrics['accuracy']:.4f}")
     print(f"Test Macro F1: {metrics['macro_f1']:.4f}")
     print(f"Test Balanced Acc: {metrics['balanced_accuracy']:.4f}")
+    print(f"Test Binary Accuracy: {metrics['binary_accuracy']:.4f}")
+    print(f"Test Binary Macro F1: {metrics['binary_macro_f1']:.4f}")
     print(f"Test Malignant Recall: {metrics['malignant_recall']:.4f}")
     print(f"Test Malignant Specificity: {metrics['malignant_specificity']:.4f}")
     print(f"Saved predictions to {predictions_path}")
@@ -445,10 +492,18 @@ def wandb_metrics(prefix, metrics):
         f"{prefix}/macro_recall": metrics["macro_recall"],
         f"{prefix}/macro_f1": metrics["macro_f1"],
         f"{prefix}/balanced_accuracy": metrics["balanced_accuracy"],
+        f"{prefix}/binary_accuracy": metrics["binary_accuracy"],
+        f"{prefix}/binary_macro_precision": metrics["binary_macro_precision"],
+        f"{prefix}/binary_macro_recall": metrics["binary_macro_recall"],
+        f"{prefix}/binary_macro_f1": metrics["binary_macro_f1"],
+        f"{prefix}/binary_balanced_accuracy": metrics["binary_balanced_accuracy"],
         f"{prefix}/malignant_precision": metrics["malignant_precision"],
         f"{prefix}/malignant_recall": metrics["malignant_recall"],
         f"{prefix}/malignant_specificity": metrics["malignant_specificity"],
         f"{prefix}/malignant_f1": metrics["malignant_f1"],
+        f"{prefix}/benign_precision": metrics["benign_precision"],
+        f"{prefix}/benign_recall": metrics["benign_recall"],
+        f"{prefix}/benign_f1": metrics["benign_f1"],
     }
 
 
