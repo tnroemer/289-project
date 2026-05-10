@@ -1,0 +1,58 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/create_data-40707242
+Job started on Sun May 10 14:55:54 EDT 2026
+Running on node: r006.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+Created HAM10000 common-label image folder and splits
+Metadata path: /ocean/projects/mth250011p/troemer/datasets/kmader/skin-cancer-mnist-ham10000/versions/2/HAM10000_metadata.csv
+Copied HAM images: 8151
+Already existed: 1607
+Missing HAM full images: 0
+Train counts:
+dx
+akiec     229
+bcc       360
+bkl       769
+mel       779
+nv       4693
+Name: count, dtype: int64
+Val counts:
+dx
+akiec      49
+bcc        77
+bkl       165
+mel       167
+nv       1006
+Name: count, dtype: int64
+Test counts:
+dx
+akiec      49
+bcc        77
+bkl       165
+mel       167
+nv       1006
+Name: count, dtype: int64
+Saved train split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_train.csv
+Saved val split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_val.csv
+Saved test split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_test.csv
+Output folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/ham10000-images
+Saved HAM metadata: /ocean/projects/mth250011p/troemer/skin-lesions/data/ham10000-images/metadata.csv
+Created PAD-UFES-20 common-label image folder
+Metadata path: /ocean/projects/mth250011p/troemer/datasets/pad-ufes-20/metadata.csv
+Common HAM/PAD labels: ['akiec', 'bcc', 'bkl', 'mel', 'nv']
+PAD mapping: {'ACK': 'akiec', 'BCC': 'bcc', 'SEK': 'bkl', 'MEL': 'mel', 'NEV': 'nv'}
+Copied PAD images: 2106
+Already existed: 0
+Missing PAD source images: 0
+PAD counts:
+common_label
+akiec    730
+bcc      845
+bkl      235
+mel       52
+nv       244
+Name: count, dtype: int64
+Output folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/pad-ufes-20-images
+Saved PAD metadata: /ocean/projects/mth250011p/troemer/skin-lesions/data/pad-ufes-20-images/metadata.csv
+Job finished on Sun May 10 15:03:10 EDT 2026

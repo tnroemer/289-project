@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/evaluate_pad_ufes20_extracted_lesions.py", line 5, in <module>
+    evaluate_pad_ufes20("lesion_white")
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/pad_ufes20_evaluation.py", line 427, in evaluate_pad_ufes20
+    df, source_name = prepare_pad_df(image_source)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/pad_ufes20_evaluation.py", line 322, in prepare_pad_df
+    df = prepare_extracted_lesion_df()
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/pad_ufes20_evaluation.py", line 301, in prepare_extracted_lesion_df
+    raise FileNotFoundError(
+    ...<3 lines>...
+    )
+FileNotFoundError: Could not find extracted PAD-UFES-20 lesion images. Run `sbatch submit/submit_create_pad_ufes20_extracted_lesions.sh` first, then rerun this evaluation job.

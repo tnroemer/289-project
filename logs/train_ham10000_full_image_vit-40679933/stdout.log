@@ -1,0 +1,91 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/train_ham10000_full_image_vit-40679933
+Job started on Fri May  8 14:45:06 EDT 2026
+Running on node: w002.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+train examples found: 6830
+train missing images: 0
+val examples found: 1464
+val missing images: 0
+test examples found: 1464
+test missing images: 0
+Train counts:
+dx
+akiec     229
+bcc       360
+bkl       769
+mel       779
+nv       4693
+Name: count, dtype: int64
+Class weights:
+akiec: 2.1962
+bcc: 1.3970
+bkl: 0.6540
+mel: 0.6456
+nv: 0.1072
+CUDA available: True
+GPU: NVIDIA H100 80GB HBM3
+Epoch 1/60 | Train Loss: 1.4463 | Train Acc: 0.4075 | Train Macro F1: 0.2879 | Train Malig Recall: 0.7149 | Val Loss: 1.3672 | Val Acc: 0.5348 | Val Macro F1: 0.3775 | Val Malig Recall: 0.6416
+Saved new best model: val_macro_f1=0.3775
+Epoch 2/60 | Train Loss: 1.3504 | Train Acc: 0.4638 | Train Macro F1: 0.3312 | Train Malig Recall: 0.7332 | Val Loss: 1.2988 | Val Acc: 0.4652 | Val Macro F1: 0.3264 | Val Malig Recall: 0.8396
+Epoch 3/60 | Train Loss: 1.2994 | Train Acc: 0.4782 | Train Macro F1: 0.3530 | Train Malig Recall: 0.7902 | Val Loss: 1.2496 | Val Acc: 0.4966 | Val Macro F1: 0.3309 | Val Malig Recall: 0.9113
+Epoch 4/60 | Train Loss: 1.2610 | Train Acc: 0.4939 | Train Macro F1: 0.3632 | Train Malig Recall: 0.7931 | Val Loss: 1.1830 | Val Acc: 0.5608 | Val Macro F1: 0.3939 | Val Malig Recall: 0.7816
+Saved new best model: val_macro_f1=0.3939
+Epoch 5/60 | Train Loss: 1.2281 | Train Acc: 0.5242 | Train Macro F1: 0.3874 | Train Malig Recall: 0.7792 | Val Loss: 1.1816 | Val Acc: 0.5963 | Val Macro F1: 0.3988 | Val Malig Recall: 0.8259
+Saved new best model: val_macro_f1=0.3988
+Epoch 6/60 | Train Loss: 1.2103 | Train Acc: 0.5227 | Train Macro F1: 0.3885 | Train Malig Recall: 0.7968 | Val Loss: 1.1623 | Val Acc: 0.5546 | Val Macro F1: 0.4230 | Val Malig Recall: 0.8123
+Saved new best model: val_macro_f1=0.4230
+Epoch 7/60 | Train Loss: 1.1617 | Train Acc: 0.5441 | Train Macro F1: 0.4102 | Train Malig Recall: 0.7946 | Val Loss: 1.2279 | Val Acc: 0.5683 | Val Macro F1: 0.4186 | Val Malig Recall: 0.6416
+Epoch 8/60 | Train Loss: 1.1679 | Train Acc: 0.5473 | Train Macro F1: 0.4089 | Train Malig Recall: 0.7909 | Val Loss: 1.1549 | Val Acc: 0.5915 | Val Macro F1: 0.4169 | Val Malig Recall: 0.7952
+Epoch 9/60 | Train Loss: 1.1465 | Train Acc: 0.5712 | Train Macro F1: 0.4233 | Train Malig Recall: 0.8019 | Val Loss: 1.0935 | Val Acc: 0.6141 | Val Macro F1: 0.4460 | Val Malig Recall: 0.8225
+Saved new best model: val_macro_f1=0.4460
+Epoch 10/60 | Train Loss: 1.1158 | Train Acc: 0.5804 | Train Macro F1: 0.4307 | Train Malig Recall: 0.8026 | Val Loss: 1.0777 | Val Acc: 0.6352 | Val Macro F1: 0.4617 | Val Malig Recall: 0.7850
+Saved new best model: val_macro_f1=0.4617
+Epoch 11/60 | Train Loss: 1.1149 | Train Acc: 0.5824 | Train Macro F1: 0.4275 | Train Malig Recall: 0.7975 | Val Loss: 1.1093 | Val Acc: 0.6346 | Val Macro F1: 0.4542 | Val Malig Recall: 0.7167
+Epoch 12/60 | Train Loss: 1.1118 | Train Acc: 0.5899 | Train Macro F1: 0.4357 | Train Malig Recall: 0.7763 | Val Loss: 1.0904 | Val Acc: 0.6031 | Val Macro F1: 0.4537 | Val Malig Recall: 0.8567
+Epoch 13/60 | Train Loss: 1.0623 | Train Acc: 0.5972 | Train Macro F1: 0.4575 | Train Malig Recall: 0.8238 | Val Loss: 1.0641 | Val Acc: 0.6059 | Val Macro F1: 0.4615 | Val Malig Recall: 0.8362
+Epoch 14/60 | Train Loss: 1.0825 | Train Acc: 0.6069 | Train Macro F1: 0.4533 | Train Malig Recall: 0.8085 | Val Loss: 1.0697 | Val Acc: 0.6434 | Val Macro F1: 0.4897 | Val Malig Recall: 0.8737
+Saved new best model: val_macro_f1=0.4897
+Epoch 15/60 | Train Loss: 1.0866 | Train Acc: 0.6029 | Train Macro F1: 0.4509 | Train Malig Recall: 0.8026 | Val Loss: 1.0301 | Val Acc: 0.6243 | Val Macro F1: 0.4760 | Val Malig Recall: 0.7474
+Epoch 16/60 | Train Loss: 1.0869 | Train Acc: 0.5925 | Train Macro F1: 0.4395 | Train Malig Recall: 0.8019 | Val Loss: 1.0475 | Val Acc: 0.6489 | Val Macro F1: 0.4915 | Val Malig Recall: 0.7986
+Saved new best model: val_macro_f1=0.4915
+Epoch 17/60 | Train Loss: 1.0522 | Train Acc: 0.6142 | Train Macro F1: 0.4639 | Train Malig Recall: 0.8165 | Val Loss: 1.0328 | Val Acc: 0.6339 | Val Macro F1: 0.4921 | Val Malig Recall: 0.8567
+Saved new best model: val_macro_f1=0.4921
+Epoch 18/60 | Train Loss: 1.0345 | Train Acc: 0.6173 | Train Macro F1: 0.4740 | Train Malig Recall: 0.8253 | Val Loss: 1.0486 | Val Acc: 0.6537 | Val Macro F1: 0.4927 | Val Malig Recall: 0.8123
+Saved new best model: val_macro_f1=0.4927
+Epoch 19/60 | Train Loss: 1.0463 | Train Acc: 0.6275 | Train Macro F1: 0.4750 | Train Malig Recall: 0.8114 | Val Loss: 1.0392 | Val Acc: 0.6079 | Val Macro F1: 0.4566 | Val Malig Recall: 0.8805
+Epoch 20/60 | Train Loss: 1.0230 | Train Acc: 0.6350 | Train Macro F1: 0.4889 | Train Malig Recall: 0.8143 | Val Loss: 1.1570 | Val Acc: 0.6742 | Val Macro F1: 0.4923 | Val Malig Recall: 0.5324
+Epoch 21/60 | Train Loss: 1.0258 | Train Acc: 0.6228 | Train Macro F1: 0.4715 | Train Malig Recall: 0.7931 | Val Loss: 0.9834 | Val Acc: 0.6523 | Val Macro F1: 0.5080 | Val Malig Recall: 0.7884
+Saved new best model: val_macro_f1=0.5080
+Epoch 22/60 | Train Loss: 1.0011 | Train Acc: 0.6327 | Train Macro F1: 0.4899 | Train Malig Recall: 0.8173 | Val Loss: 1.0566 | Val Acc: 0.6284 | Val Macro F1: 0.4979 | Val Malig Recall: 0.7782
+Epoch 23/60 | Train Loss: 1.0067 | Train Acc: 0.6228 | Train Macro F1: 0.4809 | Train Malig Recall: 0.8070 | Val Loss: 0.9864 | Val Acc: 0.6380 | Val Macro F1: 0.5047 | Val Malig Recall: 0.8771
+Epoch 24/60 | Train Loss: 0.9995 | Train Acc: 0.6348 | Train Macro F1: 0.4964 | Train Malig Recall: 0.8085 | Val Loss: 1.0063 | Val Acc: 0.6387 | Val Macro F1: 0.4936 | Val Malig Recall: 0.8191
+Epoch 25/60 | Train Loss: 0.9987 | Train Acc: 0.6297 | Train Macro F1: 0.4863 | Train Malig Recall: 0.8209 | Val Loss: 1.0225 | Val Acc: 0.5970 | Val Macro F1: 0.4659 | Val Malig Recall: 0.9522
+Epoch 26/60 | Train Loss: 0.9663 | Train Acc: 0.6392 | Train Macro F1: 0.4980 | Train Malig Recall: 0.8253 | Val Loss: 1.0145 | Val Acc: 0.6646 | Val Macro F1: 0.4904 | Val Malig Recall: 0.8430
+Epoch 27/60 | Train Loss: 0.9903 | Train Acc: 0.6291 | Train Macro F1: 0.4877 | Train Malig Recall: 0.8019 | Val Loss: 1.0031 | Val Acc: 0.6571 | Val Macro F1: 0.4915 | Val Malig Recall: 0.8498
+Epoch 28/60 | Train Loss: 0.9730 | Train Acc: 0.6448 | Train Macro F1: 0.5046 | Train Malig Recall: 0.8187 | Val Loss: 0.9659 | Val Acc: 0.6885 | Val Macro F1: 0.5147 | Val Malig Recall: 0.8567
+Saved new best model: val_macro_f1=0.5147
+Epoch 29/60 | Train Loss: 0.9670 | Train Acc: 0.6435 | Train Macro F1: 0.5058 | Train Malig Recall: 0.8173 | Val Loss: 1.0012 | Val Acc: 0.6633 | Val Macro F1: 0.5132 | Val Malig Recall: 0.6758
+Epoch 30/60 | Train Loss: 0.9755 | Train Acc: 0.6407 | Train Macro F1: 0.4964 | Train Malig Recall: 0.8056 | Val Loss: 0.9420 | Val Acc: 0.6592 | Val Macro F1: 0.5172 | Val Malig Recall: 0.8601
+Saved new best model: val_macro_f1=0.5172
+Epoch 31/60 | Train Loss: 0.9612 | Train Acc: 0.6401 | Train Macro F1: 0.5066 | Train Malig Recall: 0.8194 | Val Loss: 0.9782 | Val Acc: 0.6428 | Val Macro F1: 0.5076 | Val Malig Recall: 0.8259
+Epoch 32/60 | Train Loss: 0.9519 | Train Acc: 0.6457 | Train Macro F1: 0.5105 | Train Malig Recall: 0.8363 | Val Loss: 0.9730 | Val Acc: 0.6414 | Val Macro F1: 0.5044 | Val Malig Recall: 0.7884
+Epoch 33/60 | Train Loss: 0.9377 | Train Acc: 0.6514 | Train Macro F1: 0.5094 | Train Malig Recall: 0.8070 | Val Loss: 1.0213 | Val Acc: 0.6571 | Val Macro F1: 0.4743 | Val Malig Recall: 0.8396
+Epoch 34/60 | Train Loss: 0.9319 | Train Acc: 0.6477 | Train Macro F1: 0.5143 | Train Malig Recall: 0.8107 | Val Loss: 0.9885 | Val Acc: 0.6387 | Val Macro F1: 0.4874 | Val Malig Recall: 0.7747
+Epoch 35/60 | Train Loss: 0.9550 | Train Acc: 0.6436 | Train Macro F1: 0.5095 | Train Malig Recall: 0.8406 | Val Loss: 0.9713 | Val Acc: 0.6455 | Val Macro F1: 0.4935 | Val Malig Recall: 0.8498
+Epoch 36/60 | Train Loss: 0.9210 | Train Acc: 0.6574 | Train Macro F1: 0.5285 | Train Malig Recall: 0.8311 | Val Loss: 0.9582 | Val Acc: 0.6592 | Val Macro F1: 0.5063 | Val Malig Recall: 0.9078
+Epoch 37/60 | Train Loss: 0.9381 | Train Acc: 0.6512 | Train Macro F1: 0.5095 | Train Malig Recall: 0.8253 | Val Loss: 0.9874 | Val Acc: 0.6612 | Val Macro F1: 0.5070 | Val Malig Recall: 0.8430
+Epoch 38/60 | Train Loss: 0.9314 | Train Acc: 0.6556 | Train Macro F1: 0.5180 | Train Malig Recall: 0.8092 | Val Loss: 0.9829 | Val Acc: 0.6086 | Val Macro F1: 0.4865 | Val Malig Recall: 0.8464
+Epoch 39/60 | Train Loss: 0.9088 | Train Acc: 0.6621 | Train Macro F1: 0.5284 | Train Malig Recall: 0.8289 | Val Loss: 0.9807 | Val Acc: 0.6462 | Val Macro F1: 0.5072 | Val Malig Recall: 0.8191
+Epoch 40/60 | Train Loss: 0.9292 | Train Acc: 0.6690 | Train Macro F1: 0.5313 | Train Malig Recall: 0.8209 | Val Loss: 0.9734 | Val Acc: 0.6503 | Val Macro F1: 0.5049 | Val Malig Recall: 0.8635
+Early stopping triggered after 40 epochs.
+Test Loss: 0.9371
+Test Accuracy: 0.6769
+Test Macro F1: 0.5299
+Test Balanced Acc: 0.6183
+Test Malignant Recall: 0.8123
+Test Malignant Specificity: 0.7635
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/vit_test_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/preds/vit_test_metrics.csv
+Job finished on Fri May  8 14:54:05 EDT 2026

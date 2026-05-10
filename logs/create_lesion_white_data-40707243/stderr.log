@@ -1,0 +1,33 @@
+Traceback (most recent call last):
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 144, in load_segmentation_model
+    model.load_state_dict(state_dict, strict=True)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/jet/home/troemer/.conda/envs/stat214/lib/python3.14/site-packages/torch/nn/modules/module.py", line 2635, in load_state_dict
+    raise RuntimeError(
+    ...<3 lines>...
+    )
+RuntimeError: Error(s) in loading state_dict for UNet:
+	Missing key(s) in state_dict: "enc1.conv.0.weight", "enc1.conv.0.bias", "enc1.conv.2.weight", "enc1.conv.2.bias", "enc2.conv.0.weight", "enc2.conv.0.bias", "enc2.conv.2.weight", "enc2.conv.2.bias", "enc3.conv.0.weight", "enc3.conv.0.bias", "enc3.conv.2.weight", "enc3.conv.2.bias", "enc4.conv.0.weight", "enc4.conv.0.bias", "enc4.conv.2.weight", "enc4.conv.2.bias", "bottleneck.conv.0.weight", "bottleneck.conv.0.bias", "bottleneck.conv.2.weight", "bottleneck.conv.2.bias", "up4.weight", "up4.bias", "dec4.conv.0.weight", "dec4.conv.0.bias", "dec4.conv.2.weight", "dec4.conv.2.bias", "dec3.conv.0.weight", "dec3.conv.0.bias", "dec3.conv.2.weight", "dec3.conv.2.bias", "dec2.conv.0.weight", "dec2.conv.0.bias", "dec2.conv.2.weight", "dec2.conv.2.bias", "dec1.conv.0.weight", "dec1.conv.0.bias", "dec1.conv.2.weight", "dec1.conv.2.bias", "final_conv.weight", "final_conv.bias". 
+	Unexpected key(s) in state_dict: "down1.net.0.weight", "down1.net.0.bias", "down1.net.1.weight", "down1.net.1.bias", "down1.net.1.running_mean", "down1.net.1.running_var", "down1.net.1.num_batches_tracked", "down1.net.3.weight", "down1.net.3.bias", "down1.net.4.weight", "down1.net.4.bias", "down1.net.4.running_mean", "down1.net.4.running_var", "down1.net.4.num_batches_tracked", "down2.net.0.weight", "down2.net.0.bias", "down2.net.1.weight", "down2.net.1.bias", "down2.net.1.running_mean", "down2.net.1.running_var", "down2.net.1.num_batches_tracked", "down2.net.3.weight", "down2.net.3.bias", "down2.net.4.weight", "down2.net.4.bias", "down2.net.4.running_mean", "down2.net.4.running_var", "down2.net.4.num_batches_tracked", "down3.net.0.weight", "down3.net.0.bias", "down3.net.1.weight", "down3.net.1.bias", "down3.net.1.running_mean", "down3.net.1.running_var", "down3.net.1.num_batches_tracked", "down3.net.3.weight", "down3.net.3.bias", "down3.net.4.weight", "down3.net.4.bias", "down3.net.4.running_mean", "down3.net.4.running_var", "down3.net.4.num_batches_tracked", "conv3.net.0.weight", "conv3.net.0.bias", "conv3.net.1.weight", "conv3.net.1.bias", "conv3.net.1.running_mean", "conv3.net.1.running_var", "conv3.net.1.num_batches_tracked", "conv3.net.3.weight", "conv3.net.3.bias", "conv3.net.4.weight", "conv3.net.4.bias", "conv3.net.4.running_mean", "conv3.net.4.running_var", "conv3.net.4.num_batches_tracked", "conv2.net.0.weight", "conv2.net.0.bias", "conv2.net.1.weight", "conv2.net.1.bias", "conv2.net.1.running_mean", "conv2.net.1.running_var", "conv2.net.1.num_batches_tracked", "conv2.net.3.weight", "conv2.net.3.bias", "conv2.net.4.weight", "conv2.net.4.bias", "conv2.net.4.running_mean", "conv2.net.4.running_var", "conv2.net.4.num_batches_tracked", "conv1.net.0.weight", "conv1.net.0.bias", "conv1.net.1.weight", "conv1.net.1.bias", "conv1.net.1.running_mean", "conv1.net.1.running_var", "conv1.net.1.num_batches_tracked", "conv1.net.3.weight", "conv1.net.3.bias", "conv1.net.4.weight", "conv1.net.4.bias", "conv1.net.4.running_mean", "conv1.net.4.running_var", "conv1.net.4.num_batches_tracked", "out.weight", "out.bias", "bottleneck.net.0.weight", "bottleneck.net.0.bias", "bottleneck.net.1.weight", "bottleneck.net.1.bias", "bottleneck.net.1.running_mean", "bottleneck.net.1.running_var", "bottleneck.net.1.num_batches_tracked", "bottleneck.net.3.weight", "bottleneck.net.3.bias", "bottleneck.net.4.weight", "bottleneck.net.4.bias", "bottleneck.net.4.running_mean", "bottleneck.net.4.running_var", "bottleneck.net.4.num_batches_tracked". 
+	size mismatch for up3.weight: copying a param with shape torch.Size([256, 128, 2, 2]) from checkpoint, the shape in current model is torch.Size([128, 64, 2, 2]).
+	size mismatch for up3.bias: copying a param with shape torch.Size([128]) from checkpoint, the shape in current model is torch.Size([64]).
+	size mismatch for up2.weight: copying a param with shape torch.Size([128, 64, 2, 2]) from checkpoint, the shape in current model is torch.Size([64, 32, 2, 2]).
+	size mismatch for up2.bias: copying a param with shape torch.Size([64]) from checkpoint, the shape in current model is torch.Size([32]).
+	size mismatch for up1.weight: copying a param with shape torch.Size([64, 32, 2, 2]) from checkpoint, the shape in current model is torch.Size([32, 16, 2, 2]).
+	size mismatch for up1.bias: copying a param with shape torch.Size([32]) from checkpoint, the shape in current model is torch.Size([16]).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_lesion_white_data.py", line 9, in <module>
+    create_pad_ufes20_lesion_white_data()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 172, in main
+    model = load_segmentation_model(device)
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 151, in load_segmentation_model
+    raise RuntimeError(
+    ...<2 lines>...
+    ) from last_error
+RuntimeError: Could not load segmentation_unet_v2.pth into the U-Net architecture in this script. The checkpoint may have been trained with different layer names or widths.

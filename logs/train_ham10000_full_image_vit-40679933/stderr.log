@@ -1,0 +1,47 @@
+/ocean/projects/mth250011p/troemer/skin-lesions/src/model_architectures.py:95: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True
+  self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=depth)
+wandb: [wandb.login()] Using explicit session credentials for https://api.wandb.ai.
+wandb: Appending key for api.wandb.ai to your netrc file: /jet/home/troemer/.netrc
+wandb: Currently logged in as: tnroemer (tnroemer-berk) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run xl97syjb
+wandb: Tracking run with wandb version 0.26.1
+wandb: Run data is saved locally in /ocean/projects/mth250011p/troemer/wandb/wandb/run-20260508_144524-xl97syjb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run vit
+wandb: ⭐️ View project at https://wandb.ai/tnroemer-berk/skin-cancer-cnn
+wandb: 🚀 View run at https://wandb.ai/tnroemer-berk/skin-cancer-cnn/runs/xl97syjb
+wandb: WARNING Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: updating run metadata
+wandb: uploading history steps 40-40, summary, console lines 56-63
+wandb: 
+wandb: Run history:
+wandb:                    epoch ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb:            test/accuracy ▁
+wandb:   test/balanced_accuracy ▁
+wandb:                test/loss ▁
+wandb:            test/macro_f1 ▁
+wandb:     test/macro_precision ▁
+wandb:        test/macro_recall ▁
+wandb:        test/malignant_f1 ▁
+wandb: test/malignant_precision ▁
+wandb:    test/malignant_recall ▁
+wandb:                      +21 ...
+wandb: 
+wandb: Run summary:
+wandb:                     best_epoch 30
+wandb:              best_val_accuracy 0.65915
+wandb:     best_val_balanced_accuracy 0.62486
+wandb:              best_val_macro_f1 0.51718
+wandb:      best_val_malignant_recall 0.86007
+wandb: best_val_malignant_specificity 0.75149
+wandb:                          epoch 40
+wandb:                  test/accuracy 0.67691
+wandb:         test/balanced_accuracy 0.61828
+wandb:                      test/loss 0.93715
+wandb:                            +33 ...
+wandb: 
+wandb: 🚀 View run vit at: https://wandb.ai/tnroemer-berk/skin-cancer-cnn/runs/xl97syjb
+wandb: ⭐️ View project at: https://wandb.ai/tnroemer-berk/skin-cancer-cnn
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 1 other file(s)
+wandb: Find logs at: /ocean/projects/mth250011p/troemer/wandb/wandb/run-20260508_144524-xl97syjb/logs

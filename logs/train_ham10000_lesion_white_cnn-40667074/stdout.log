@@ -1,0 +1,75 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/train_ham10000_lesion_white_cnn-40667074
+Job started on Thu May  7 20:46:54 EDT 2026
+Running on node: w002.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+Using lesion-white image folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/lesion-white-images
+Found lesion-white images: 10015
+Missing lesion-white images: 0
+CUDA available: True
+GPU: NVIDIA H100 80GB HBM3
+Epoch 1/50 | Train Loss: 1.0395 | Train Acc: 0.5330 | Train Precision: 0.2602 | Train Recall: 0.7562 | Val Loss: 0.9683 | Val Acc: 0.4858 | Val Precision: 0.2713 | Val Recall: 0.9693
+Saved new best model: val_f1=0.4239
+Epoch 2/50 | Train Loss: 0.9124 | Train Acc: 0.5748 | Train Precision: 0.3025 | Train Recall: 0.9034 | Val Loss: 0.9572 | Val Acc: 0.7409 | Val Precision: 0.3532 | Val Recall: 0.3939
+Epoch 3/50 | Train Loss: 0.8666 | Train Acc: 0.5961 | Train Precision: 0.3114 | Train Recall: 0.8836 | Val Loss: 0.8908 | Val Acc: 0.5761 | Val Precision: 0.3088 | Val Recall: 0.9463
+Saved new best model: val_f1=0.4657
+Epoch 4/50 | Train Loss: 0.8539 | Train Acc: 0.6141 | Train Precision: 0.3216 | Train Recall: 0.8816 | Val Loss: 0.8689 | Val Acc: 0.6141 | Val Precision: 0.3228 | Val Recall: 0.8900
+Saved new best model: val_f1=0.4738
+Epoch 5/50 | Train Loss: 0.8320 | Train Acc: 0.6455 | Train Precision: 0.3386 | Train Recall: 0.8573 | Val Loss: 0.8541 | Val Acc: 0.6096 | Val Precision: 0.3221 | Val Recall: 0.9054
+Saved new best model: val_f1=0.4752
+Epoch 6/50 | Train Loss: 0.8383 | Train Acc: 0.6501 | Train Precision: 0.3407 | Train Recall: 0.8484 | Val Loss: 0.8455 | Val Acc: 0.6500 | Val Precision: 0.3372 | Val Recall: 0.8210
+Saved new best model: val_f1=0.4780
+Epoch 7/50 | Train Loss: 0.8150 | Train Acc: 0.6676 | Train Precision: 0.3534 | Train Recall: 0.8484 | Val Loss: 0.8503 | Val Acc: 0.6365 | Val Precision: 0.3320 | Val Recall: 0.8517
+Epoch 8/50 | Train Loss: 0.8094 | Train Acc: 0.6605 | Train Precision: 0.3473 | Train Recall: 0.8420 | Val Loss: 0.8299 | Val Acc: 0.6340 | Val Precision: 0.3320 | Val Recall: 0.8645
+Saved new best model: val_f1=0.4798
+Epoch 9/50 | Train Loss: 0.7965 | Train Acc: 0.6729 | Train Precision: 0.3569 | Train Recall: 0.8445 | Val Loss: 0.8533 | Val Acc: 0.6365 | Val Precision: 0.3343 | Val Recall: 0.8696
+Saved new best model: val_f1=0.4830
+Epoch 10/50 | Train Loss: 0.7836 | Train Acc: 0.6836 | Train Precision: 0.3660 | Train Recall: 0.8490 | Val Loss: 0.8150 | Val Acc: 0.6910 | Val Precision: 0.3674 | Val Recall: 0.8082
+Saved new best model: val_f1=0.5052
+Epoch 11/50 | Train Loss: 0.7578 | Train Acc: 0.7143 | Train Precision: 0.3922 | Train Recall: 0.8452 | Val Loss: 0.7885 | Val Acc: 0.7184 | Val Precision: 0.3928 | Val Recall: 0.8107
+Saved new best model: val_f1=0.5292
+Epoch 12/50 | Train Loss: 0.7521 | Train Acc: 0.7190 | Train Precision: 0.3964 | Train Recall: 0.8426 | Val Loss: 0.8475 | Val Acc: 0.6675 | Val Precision: 0.3569 | Val Recall: 0.8772
+Epoch 13/50 | Train Loss: 0.7531 | Train Acc: 0.7183 | Train Precision: 0.3947 | Train Recall: 0.8324 | Val Loss: 0.7960 | Val Acc: 0.6530 | Val Precision: 0.3498 | Val Recall: 0.9054
+Epoch 14/50 | Train Loss: 0.7345 | Train Acc: 0.7319 | Train Precision: 0.4085 | Train Recall: 0.8349 | Val Loss: 0.7801 | Val Acc: 0.7064 | Val Precision: 0.3856 | Val Recall: 0.8491
+Saved new best model: val_f1=0.5304
+Epoch 15/50 | Train Loss: 0.7379 | Train Acc: 0.7210 | Train Precision: 0.3992 | Train Recall: 0.8509 | Val Loss: 0.7800 | Val Acc: 0.6740 | Val Precision: 0.3635 | Val Recall: 0.8926
+Epoch 16/50 | Train Loss: 0.7266 | Train Acc: 0.7368 | Train Precision: 0.4146 | Train Recall: 0.8477 | Val Loss: 0.7612 | Val Acc: 0.7329 | Val Precision: 0.4079 | Val Recall: 0.8159
+Saved new best model: val_f1=0.5439
+Epoch 17/50 | Train Loss: 0.7276 | Train Acc: 0.7307 | Train Precision: 0.4085 | Train Recall: 0.8503 | Val Loss: 0.7795 | Val Acc: 0.6620 | Val Precision: 0.3567 | Val Recall: 0.9105
+Epoch 18/50 | Train Loss: 0.7223 | Train Acc: 0.7299 | Train Precision: 0.4082 | Train Recall: 0.8554 | Val Loss: 0.7687 | Val Acc: 0.7234 | Val Precision: 0.3975 | Val Recall: 0.8082
+Epoch 19/50 | Train Loss: 0.7140 | Train Acc: 0.7414 | Train Precision: 0.4193 | Train Recall: 0.8464 | Val Loss: 0.7802 | Val Acc: 0.6910 | Val Precision: 0.3747 | Val Recall: 0.8721
+Epoch 20/50 | Train Loss: 0.7127 | Train Acc: 0.7399 | Train Precision: 0.4183 | Train Recall: 0.8535 | Val Loss: 0.7553 | Val Acc: 0.6860 | Val Precision: 0.3747 | Val Recall: 0.9105
+Epoch 21/50 | Train Loss: 0.7042 | Train Acc: 0.7428 | Train Precision: 0.4217 | Train Recall: 0.8580 | Val Loss: 0.7690 | Val Acc: 0.7564 | Val Precision: 0.4327 | Val Recall: 0.7980
+Saved new best model: val_f1=0.5612
+Epoch 22/50 | Train Loss: 0.6966 | Train Acc: 0.7507 | Train Precision: 0.4312 | Train Recall: 0.8701 | Val Loss: 0.7567 | Val Acc: 0.7494 | Val Precision: 0.4263 | Val Recall: 0.8210
+Saved new best model: val_f1=0.5612
+Epoch 23/50 | Train Loss: 0.7027 | Train Acc: 0.7515 | Train Precision: 0.4308 | Train Recall: 0.8522 | Val Loss: 0.7560 | Val Acc: 0.6895 | Val Precision: 0.3770 | Val Recall: 0.9054
+Epoch 24/50 | Train Loss: 0.6916 | Train Acc: 0.7589 | Train Precision: 0.4389 | Train Recall: 0.8484 | Val Loss: 0.7380 | Val Acc: 0.7239 | Val Precision: 0.4029 | Val Recall: 0.8593
+Epoch 25/50 | Train Loss: 0.6826 | Train Acc: 0.7605 | Train Precision: 0.4408 | Train Recall: 0.8477 | Val Loss: 0.7532 | Val Acc: 0.7204 | Val Precision: 0.4007 | Val Recall: 0.8721
+Epoch 26/50 | Train Loss: 0.6807 | Train Acc: 0.7579 | Train Precision: 0.4379 | Train Recall: 0.8496 | Val Loss: 0.7339 | Val Acc: 0.7579 | Val Precision: 0.4356 | Val Recall: 0.8133
+Saved new best model: val_f1=0.5674
+Epoch 27/50 | Train Loss: 0.6773 | Train Acc: 0.7630 | Train Precision: 0.4447 | Train Recall: 0.8637 | Val Loss: 0.7258 | Val Acc: 0.7349 | Val Precision: 0.4127 | Val Recall: 0.8465
+Epoch 28/50 | Train Loss: 0.6692 | Train Acc: 0.7611 | Train Precision: 0.4415 | Train Recall: 0.8477 | Val Loss: 0.7301 | Val Acc: 0.7604 | Val Precision: 0.4391 | Val Recall: 0.8210
+Saved new best model: val_f1=0.5722
+Epoch 29/50 | Train Loss: 0.6688 | Train Acc: 0.7667 | Train Precision: 0.4488 | Train Recall: 0.8586 | Val Loss: 0.7561 | Val Acc: 0.7259 | Val Precision: 0.4044 | Val Recall: 0.8542
+Epoch 30/50 | Train Loss: 0.6622 | Train Acc: 0.7666 | Train Precision: 0.4483 | Train Recall: 0.8516 | Val Loss: 0.7506 | Val Acc: 0.7274 | Val Precision: 0.4078 | Val Recall: 0.8772
+Epoch 31/50 | Train Loss: 0.6508 | Train Acc: 0.7750 | Train Precision: 0.4595 | Train Recall: 0.8701 | Val Loss: 0.7187 | Val Acc: 0.7439 | Val Precision: 0.4222 | Val Recall: 0.8465
+Epoch 32/50 | Train Loss: 0.6454 | Train Acc: 0.7775 | Train Precision: 0.4625 | Train Recall: 0.8682 | Val Loss: 0.7799 | Val Acc: 0.8003 | Val Precision: 0.4918 | Val Recall: 0.6905
+Saved new best model: val_f1=0.5745
+Epoch 33/50 | Train Loss: 0.6546 | Train Acc: 0.7753 | Train Precision: 0.4596 | Train Recall: 0.8618 | Val Loss: 0.7144 | Val Acc: 0.7429 | Val Precision: 0.4227 | Val Recall: 0.8670
+Epoch 34/50 | Train Loss: 0.6496 | Train Acc: 0.7741 | Train Precision: 0.4581 | Train Recall: 0.8637 | Val Loss: 0.7317 | Val Acc: 0.7299 | Val Precision: 0.4083 | Val Recall: 0.8542
+Epoch 35/50 | Train Loss: 0.6406 | Train Acc: 0.7786 | Train Precision: 0.4638 | Train Recall: 0.8644 | Val Loss: 0.7071 | Val Acc: 0.7399 | Val Precision: 0.4213 | Val Recall: 0.8900
+Epoch 36/50 | Train Loss: 0.6275 | Train Acc: 0.7854 | Train Precision: 0.4730 | Train Recall: 0.8733 | Val Loss: 0.7279 | Val Acc: 0.7399 | Val Precision: 0.4190 | Val Recall: 0.8593
+Epoch 37/50 | Train Loss: 0.6366 | Train Acc: 0.7767 | Train Precision: 0.4617 | Train Recall: 0.8708 | Val Loss: 0.7729 | Val Acc: 0.7693 | Val Precision: 0.4480 | Val Recall: 0.7826
+Epoch 38/50 | Train Loss: 0.6275 | Train Acc: 0.7847 | Train Precision: 0.4720 | Train Recall: 0.8740 | Val Loss: 0.7053 | Val Acc: 0.7494 | Val Precision: 0.4288 | Val Recall: 0.8542
+Epoch 39/50 | Train Loss: 0.6224 | Train Acc: 0.7832 | Train Precision: 0.4699 | Train Recall: 0.8676 | Val Loss: 0.7188 | Val Acc: 0.7359 | Val Precision: 0.4152 | Val Recall: 0.8645
+Epoch 40/50 | Train Loss: 0.6153 | Train Acc: 0.7884 | Train Precision: 0.4770 | Train Recall: 0.8759 | Val Loss: 0.7397 | Val Acc: 0.6835 | Val Precision: 0.3730 | Val Recall: 0.9130
+Early stopping triggered after 40 epochs.
+Test Loss: 0.7799
+Test Acc: 0.8003
+Test Precision: 0.4918
+Test Recall: 0.6905
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/basic_cnn_lesion_white_binary_test_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/preds/basic_cnn_lesion_white_binary_test_metrics.csv
+Job finished on Thu May  7 20:52:42 EDT 2026
