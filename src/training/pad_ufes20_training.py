@@ -9,12 +9,21 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
+from clinical_operating_point import (
+    TARGET_SENSITIVITY,
+    apply_temperature,
+    choose_threshold_for_sensitivity,
+    fit_temperature,
+    malignant_scores_from_probs,
+)
 from training.ham10000_training import (
     COMMON_LABELS,
+    MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
     MALIGNANT_LABELS,
     TRAIN_AUGMENTATION_NOTE,
     SkinLesionDataset,
     batch_size,
+    collect_logits,
     compute_class_weights,
     evaluate,
     load_checkpoint,
@@ -137,8 +146,14 @@ def train_pad_ufes20_full_image_resnet():
         "num_classes": len(COMMON_LABELS),
         "num_workers": num_workers,
         "class_weights": class_weights,
-        "class_weight_note": "inverse frequency weights normalized to mean 1",
+        "class_weight_note": (
+            "inverse frequency weights with malignant classes multiplied by "
+            f"{MALIGNANT_CLASS_WEIGHT_MULTIPLIER}, normalized to mean 1"
+        ),
+        "malignant_class_weight_multiplier": MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
         "scheduler": "cosine_annealing_lr",
+        "target_sensitivity": TARGET_SENSITIVITY,
+        "calibration": "temperature_scaling_on_validation_logits",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
@@ -256,6 +271,39 @@ def train_pad_ufes20_full_image_resnet():
     checkpoint = load_checkpoint(best_model_path, device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
+    val_logits, val_targets = collect_logits(model, val_loader, device)
+    temperature = fit_temperature(val_logits, val_targets, device)
+    val_probs = apply_temperature(val_logits, temperature)
+    val_scores = malignant_scores_from_probs(val_probs, COMMON_LABELS, MALIGNANT_LABELS)
+    malignant_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+        val_targets,
+        val_scores.tolist(),
+        COMMON_LABELS,
+        MALIGNANT_LABELS,
+        TARGET_SENSITIVITY,
+    )
+
+    checkpoint["temperature"] = temperature
+    checkpoint["malignant_threshold"] = malignant_threshold
+    checkpoint["target_sensitivity"] = TARGET_SENSITIVITY
+    checkpoint["val_operating_metrics"] = val_operating_metrics
+    checkpoint["config"]["temperature"] = temperature
+    checkpoint["config"]["malignant_threshold"] = malignant_threshold
+    torch.save(checkpoint, best_model_path)
+
+    print(f"Validation temperature: {temperature:.4f}")
+    print(f"Validation operating threshold: {malignant_threshold:.4f}")
+    print(f"Validation operating malignant recall: {val_operating_metrics['malignant_recall']:.4f}")
+    print(f"Validation operating malignant specificity: {val_operating_metrics['malignant_specificity']:.4f}")
+
+    val_operating_log = {
+        f"val_operating/{name}": value
+        for name, value in val_operating_metrics.items()
+        if isinstance(value, (int, float))
+    }
+    val_operating_log["val_operating/temperature"] = temperature
+    wandb.log(val_operating_log)
+
     test_metrics = save_predictions(
         model,
         test_loader,
@@ -264,6 +312,8 @@ def train_pad_ufes20_full_image_resnet():
         COMMON_LABELS,
         predictions_path,
         metrics_path,
+        temperature=temperature,
+        malignant_threshold=malignant_threshold,
     )
 
     wandb.log(wandb_metrics("test", test_metrics))
@@ -277,5 +327,9 @@ def train_pad_ufes20_full_image_resnet():
     wandb.run.summary["test_malignant_recall"] = test_metrics["malignant_recall"]
     wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
     wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
+    wandb.run.summary["operating_threshold"] = malignant_threshold
+    wandb.run.summary["temperature"] = temperature
+    wandb.run.summary["test_operating_malignant_recall"] = test_metrics["operating_malignant_recall"]
+    wandb.run.summary["test_operating_malignant_specificity"] = test_metrics["operating_malignant_specificity"]
 
     wandb.finish()

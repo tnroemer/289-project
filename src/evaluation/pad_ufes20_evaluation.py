@@ -7,6 +7,12 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
+from clinical_operating_point import (
+    apply_temperature,
+    binary_metrics_from_scores,
+    malignant_scores_from_probs,
+    operating_metrics_to_rows,
+)
 from models.model_architectures import build_model
 
 
@@ -264,6 +270,8 @@ def predict_model(model_spec, df, device):
     labels = checkpoint.get("labels", COMMON_LABELS)
     config = checkpoint.get("config", {})
     image_size = config.get("image_size", 224)
+    temperature = checkpoint.get("temperature", config.get("temperature", 1.0))
+    malignant_threshold = checkpoint.get("malignant_threshold", config.get("malignant_threshold", 0.5))
     config["use_pretrained_backbone"] = False
 
     model = build_model(model_spec["type"], num_classes=len(labels), config=config)
@@ -290,8 +298,9 @@ def predict_model(model_spec, df, device):
             labels_batch = batch["labels"].to(device, non_blocking=True)
 
             outputs = model(images)
-            probs = torch.softmax(outputs, dim=1)
+            probs = apply_temperature(outputs, temperature)
             preds = outputs.argmax(dim=1)
+            malignant_scores = malignant_scores_from_probs(probs, labels, MALIGNANT_LABELS)
 
             targets.extend(labels_batch.cpu().tolist())
             probs_all.append(probs.cpu())
@@ -299,10 +308,13 @@ def predict_model(model_spec, df, device):
             probs_cpu = probs.cpu()
             preds_cpu = preds.cpu()
             labels_cpu = labels_batch.cpu()
+            malignant_scores_cpu = malignant_scores.cpu()
 
             for i in range(images.size(0)):
                 pred_index = int(preds_cpu[i])
                 true_index = int(labels_cpu[i])
+                malignant_score = float(malignant_scores_cpu[i])
+                pred_binary_threshold = "malignant" if malignant_score >= malignant_threshold else "benign"
 
                 row = {
                     "img_id": batch["img_id"][i],
@@ -315,8 +327,13 @@ def predict_model(model_spec, df, device):
                     "correct": int(pred_index == true_index),
                     "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
                     "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
+                    "malignant_score": malignant_score,
+                    "operating_threshold": malignant_threshold,
+                    "temperature": temperature,
+                    "pred_binary_threshold": pred_binary_threshold,
                 }
                 row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
+                row["binary_threshold_correct"] = int(row["true_binary"] == row["pred_binary_threshold"])
 
                 for j, label in enumerate(labels):
                     row[f"prob_{label}"] = float(probs_cpu[i, j])
@@ -328,28 +345,59 @@ def predict_model(model_spec, df, device):
         "targets": targets,
         "probs": torch.cat(probs_all, dim=0),
         "rows": rows,
+        "temperature": temperature,
+        "malignant_threshold": malignant_threshold,
     }
 
 
-def save_model_predictions(rows, probs, labels, source_name, model_name):
+def save_model_predictions(
+    rows,
+    probs,
+    labels,
+    source_name,
+    model_name,
+    malignant_threshold=0.5,
+    temperature=None,
+):
     preds_all = probs.argmax(dim=1).tolist()
+    malignant_scores = malignant_scores_from_probs(probs, labels, MALIGNANT_LABELS)
 
     output_rows = []
     for i, row in enumerate(rows):
         output_row = row.copy()
         pred_index = preds_all[i]
+        malignant_score = float(malignant_scores[i])
+        pred_binary_threshold = "malignant" if malignant_score >= malignant_threshold else "benign"
+
         output_row["pred_label"] = pred_index
         output_row["pred_dx"] = labels[pred_index]
         output_row["correct"] = int(pred_index == output_row["true_label"])
         output_row["pred_binary"] = "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign"
         output_row["binary_correct"] = int(output_row["true_binary"] == output_row["pred_binary"])
+        output_row["malignant_score"] = malignant_score
+        output_row["operating_threshold"] = malignant_threshold
+        output_row["temperature"] = temperature
+        output_row["pred_binary_threshold"] = pred_binary_threshold
+        output_row["binary_threshold_correct"] = int(output_row["true_binary"] == pred_binary_threshold)
 
         for j, label in enumerate(labels):
             output_row[f"prob_{label}"] = float(probs[i, j])
 
         output_rows.append(output_row)
 
-    metrics_df = compute_metrics([row["true_label"] for row in output_rows], preds_all, labels)
+    targets = [row["true_label"] for row in output_rows]
+    metrics_df = compute_metrics(targets, preds_all, labels)
+    operating_metrics = binary_metrics_from_scores(
+        targets,
+        malignant_scores.tolist(),
+        labels,
+        MALIGNANT_LABELS,
+        malignant_threshold,
+    )
+    metrics_df = pd.concat([
+        metrics_df,
+        pd.DataFrame(operating_metrics_to_rows(operating_metrics, temperature=temperature)),
+    ], ignore_index=True)
 
     os.makedirs(PRED_DIR, exist_ok=True)
     predictions_path = os.path.join(
@@ -380,6 +428,8 @@ def evaluate_model(model_spec, df, source_name, device):
         result["labels"],
         source_name,
         model_spec["name"],
+        malignant_threshold=result["malignant_threshold"],
+        temperature=result["temperature"],
     )
 
     return result
@@ -404,8 +454,17 @@ def evaluate_ensemble(model_results, source_name):
         return
 
     probs = torch.stack([result["probs"] for result in matching_results], dim=0).mean(dim=0)
+    malignant_threshold = sum(result["malignant_threshold"] for result in matching_results) / len(matching_results)
 
-    save_model_predictions(rows, probs, labels, source_name, "ensemble")
+    save_model_predictions(
+        rows,
+        probs,
+        labels,
+        source_name,
+        "ensemble",
+        malignant_threshold=malignant_threshold,
+        temperature=None,
+    )
 
 
 def evaluate_pad_ufes20(image_source):
