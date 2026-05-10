@@ -159,6 +159,7 @@ def train_pad_ufes20_full_image_resnet():
         "scheduler": "cosine_annealing_lr",
         "target_sensitivity": TARGET_SENSITIVITY,
         "threshold_selection": "validation_threshold_for_target_sensitivity_after_training",
+        "model_selection": "highest_validation_specificity_at_target_sensitivity",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
@@ -191,8 +192,8 @@ def train_pad_ufes20_full_image_resnet():
     predictions_path = os.path.join(PRED_DIR, f"{model_name}_test_predictions.csv")
     metrics_path = os.path.join(PRED_DIR, f"{model_name}_test_metrics.csv")
 
-    best_val_macro_f1 = -1.0
-    patience = 10
+    best_val_operating_specificity = -1.0
+    patience = 20
     epochs_without_improvement = 0
 
     for epoch in range(1, num_epochs + 1):
@@ -211,16 +212,36 @@ def train_pad_ufes20_full_image_resnet():
             device,
             BINARY_LABELS,
         )
+        val_logits, val_targets = collect_logits(model, val_loader, device)
+        val_scores = scores_from_logits(val_logits)
+        val_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+            val_targets,
+            val_scores.tolist(),
+            BINARY_LABELS,
+            MALIGNANT_LABELS,
+            TARGET_SENSITIVITY,
+        )
 
         log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
         log_row.update(wandb_metrics("train", train_metrics))
         log_row.update(wandb_metrics("val", val_metrics))
+        log_row.update({
+            f"val_operating/{name}": value
+            for name, value in val_operating_metrics.items()
+            if isinstance(value, (int, float))
+        })
         wandb.log(log_row)
 
         print_epoch(epoch, train_metrics, val_metrics)
+        print(
+            f"Val Operating Threshold: {val_threshold:.4f} | "
+            f"Val Operating Malig Recall: {val_operating_metrics['malignant_recall']:.4f} | "
+            f"Val Operating Malig Specificity: {val_operating_metrics['malignant_specificity']:.4f}"
+        )
 
-        if val_metrics["macro_f1"] > best_val_macro_f1:
-            best_val_macro_f1 = val_metrics["macro_f1"]
+        val_selection_score = val_operating_metrics["malignant_specificity"]
+        if val_selection_score > best_val_operating_specificity:
+            best_val_operating_specificity = val_selection_score
             epochs_without_improvement = 0
 
             checkpoint = {
@@ -231,6 +252,11 @@ def train_pad_ufes20_full_image_resnet():
                 "labels": BINARY_LABELS,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
                 "pos_weight": pos_weight,
+                "malignant_threshold": val_threshold,
+                "target_sensitivity": TARGET_SENSITIVITY,
+                "val_operating_metrics": val_operating_metrics,
+                "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
+                "selection_score": val_selection_score,
                 "val_loss": val_metrics["loss"],
                 "val_accuracy": val_metrics["accuracy"],
                 "val_macro_precision": val_metrics["macro_precision"],
@@ -245,12 +271,21 @@ def train_pad_ufes20_full_image_resnet():
                 "val_malignant_specificity": val_metrics["malignant_specificity"],
                 "val_malignant_f1": val_metrics["malignant_f1"],
                 "val_benign_recall": val_metrics["benign_recall"],
-                "config": config,
+                "config": {
+                    **config,
+                    "malignant_threshold": val_threshold,
+                    "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
+                    "selection_score": val_selection_score,
+                },
             }
 
             torch.save(checkpoint, best_model_path)
 
             wandb.run.summary["best_epoch"] = epoch
+            wandb.run.summary["best_val_operating_threshold"] = val_threshold
+            wandb.run.summary["best_val_operating_malignant_recall"] = val_operating_metrics["malignant_recall"]
+            wandb.run.summary["best_val_operating_malignant_specificity"] = val_operating_metrics["malignant_specificity"]
+            wandb.run.summary["best_val_selection_score"] = val_selection_score
             wandb.run.summary["best_val_macro_f1"] = val_metrics["macro_f1"]
             wandb.run.summary["best_val_accuracy"] = val_metrics["accuracy"]
             wandb.run.summary["best_val_balanced_accuracy"] = val_metrics["balanced_accuracy"]
@@ -263,7 +298,10 @@ def train_pad_ufes20_full_image_resnet():
 
             wandb.save(best_model_path)
 
-            print(f"Saved new best model: val_macro_f1={val_metrics['macro_f1']:.4f}")
+            print(
+                "Saved new best model: "
+                f"val_operating_malignant_specificity={val_selection_score:.4f}"
+            )
         else:
             epochs_without_improvement += 1
 
