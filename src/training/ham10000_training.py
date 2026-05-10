@@ -7,6 +7,7 @@ import wandb
 from PIL import Image
 from torch import nn
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
@@ -36,16 +37,16 @@ MODEL_SETTINGS = {
         "display_name": "basic-cnn",
         "checkpoint_name": "basic_cnn",
         "model": "BasicCNN",
-        "image_size": 128,
+        "image_size": 224,
         "learning_rate": 3e-4,
     },
     "vit": {
         "display_name": "vit",
         "checkpoint_name": "vit",
         "model": "ViT",
-        "image_size": 96,
+        "image_size": 224,
         "learning_rate": 2e-4,
-        "patch_size": 8,
+        "patch_size": 16,
         "embed_dim": 192,
         "depth": 6,
         "num_heads": 6,
@@ -56,8 +57,17 @@ MODEL_SETTINGS = {
         "display_name": "resnet",
         "checkpoint_name": "resnet",
         "model": "SimpleResNet",
-        "image_size": 128,
+        "image_size": 224,
         "learning_rate": 3e-4,
+    },
+    "pretrained_resnet50": {
+        "display_name": "pretrained-resnet50",
+        "checkpoint_name": "pretrained_resnet50",
+        "model": "ImageNetResNet50HeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
     },
 }
 
@@ -314,6 +324,11 @@ def compute_metrics(targets, preds, labels):
 
 def train_one_epoch(model, loader, optimizer, criterion, device, labels):
     model.train()
+
+    if getattr(model, "freeze_backbone", False):
+        for module in model.modules():
+            if isinstance(module, nn.BatchNorm2d):
+                module.eval()
 
     total_loss = 0.0
     total = 0
@@ -593,13 +608,23 @@ def train_ham10000_model(model_type, image_source):
         "num_workers": num_workers,
         "class_weights": class_weights,
         "class_weight_note": "inverse frequency weights normalized to mean 1",
+        "scheduler": "cosine_annealing_lr",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
         "test_size": len(test_df),
     }
 
-    for key in ["patch_size", "embed_dim", "depth", "num_heads", "mlp_dim", "dropout"]:
+    for key in [
+        "patch_size",
+        "embed_dim",
+        "depth",
+        "num_heads",
+        "mlp_dim",
+        "dropout",
+        "use_pretrained_backbone",
+        "finetune",
+    ]:
         if key in settings:
             config[key] = settings[key]
 
@@ -616,7 +641,11 @@ def train_ham10000_model(model_type, image_source):
 
     weight_tensor = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=weight_tensor)
-    optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    optimizer = AdamW(trainable_parameters, lr=learning_rate, weight_decay=1e-4)
+    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+
+    print(f"Trainable parameters: {sum(parameter.numel() for parameter in trainable_parameters)}")
 
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(PRED_DIR, exist_ok=True)
@@ -646,7 +675,7 @@ def train_ham10000_model(model_type, image_source):
             COMMON_LABELS,
         )
 
-        log_row = {"epoch": epoch}
+        log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
         log_row.update(wandb_metrics("train", train_metrics))
         log_row.update(wandb_metrics("val", val_metrics))
         wandb.log(log_row)
@@ -661,6 +690,7 @@ def train_ham10000_model(model_type, image_source):
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
                 "labels": COMMON_LABELS,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
                 "class_weights": class_weights,
@@ -699,6 +729,8 @@ def train_ham10000_model(model_type, image_source):
             print(f"Saved new best model: val_macro_f1={val_metrics['macro_f1']:.4f}")
         else:
             epochs_without_improvement += 1
+
+        scheduler.step()
 
         if epochs_without_improvement >= patience:
             print(f"Early stopping triggered after {epoch} epochs.")

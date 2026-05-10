@@ -43,9 +43,11 @@ for train_script in \
     submit/submit_train_ham10000_full_image_cnn.sh \
     submit/submit_train_ham10000_full_image_vit.sh \
     submit/submit_train_ham10000_full_image_resnet.sh \
+    submit/submit_train_ham10000_full_image_pretrained_resnet50.sh \
     submit/submit_train_ham10000_lesion_white_cnn.sh \
     submit/submit_train_ham10000_lesion_white_vit.sh \
     submit/submit_train_ham10000_lesion_white_resnet.sh \
+    submit/submit_train_ham10000_lesion_white_pretrained_resnet50.sh \
     submit/submit_train_pad_ufes20_full_image_resnet.sh
 do
     train_job=$(submit_job --dependency=afterok:${lesion_white_job} "$train_script")

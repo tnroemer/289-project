@@ -183,6 +183,11 @@ def model_specs(image_source):
             {"name": "basic_cnn", "path": os.path.join(MODEL_DIR, "basic_cnn_best.pt"), "type": "cnn"},
             {"name": "vit", "path": os.path.join(MODEL_DIR, "vit_best.pt"), "type": "vit"},
             {"name": "resnet", "path": os.path.join(MODEL_DIR, "resnet_best.pt"), "type": "resnet"},
+            {
+                "name": "pretrained_resnet50",
+                "path": os.path.join(MODEL_DIR, "pretrained_resnet50_best.pt"),
+                "type": "pretrained_resnet50",
+            },
         ]
 
     if image_source == "lesion_white":
@@ -201,6 +206,11 @@ def model_specs(image_source):
                 "name": "resnet_lesion_white",
                 "path": os.path.join(MODEL_DIR, "resnet_lesion_white_best.pt"),
                 "type": "resnet",
+            },
+            {
+                "name": "pretrained_resnet50_lesion_white",
+                "path": os.path.join(MODEL_DIR, "pretrained_resnet50_lesion_white_best.pt"),
+                "type": "pretrained_resnet50",
             },
         ]
 
@@ -245,15 +255,16 @@ def prepare_pad_df(image_source):
     return df, source_name
 
 
-def evaluate_model(model_spec, df, source_name, device):
+def predict_model(model_spec, df, device):
     if not os.path.exists(model_spec["path"]):
         print(f"Skipping missing model: {model_spec['path']}")
-        return
+        return None
 
     checkpoint = load_checkpoint(model_spec["path"], device)
     labels = checkpoint.get("labels", COMMON_LABELS)
     config = checkpoint.get("config", {})
-    image_size = config.get("image_size", 128 if model_spec["type"] != "vit" else 96)
+    image_size = config.get("image_size", 224)
+    config["use_pretrained_backbone"] = False
 
     model = build_model(model_spec["type"], num_classes=len(labels), config=config)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -271,7 +282,7 @@ def evaluate_model(model_spec, df, source_name, device):
 
     rows = []
     targets = []
-    preds_all = []
+    probs_all = []
 
     with torch.no_grad():
         for batch in loader:
@@ -283,7 +294,7 @@ def evaluate_model(model_spec, df, source_name, device):
             preds = outputs.argmax(dim=1)
 
             targets.extend(labels_batch.cpu().tolist())
-            preds_all.extend(preds.cpu().tolist())
+            probs_all.append(probs.cpu())
 
             probs_cpu = probs.cpu()
             preds_cpu = preds.cpu()
@@ -312,24 +323,89 @@ def evaluate_model(model_spec, df, source_name, device):
 
                 rows.append(row)
 
-    pred_df = pd.DataFrame(rows)
-    metrics_df = compute_metrics(targets, preds_all, labels)
+    return {
+        "labels": labels,
+        "targets": targets,
+        "probs": torch.cat(probs_all, dim=0),
+        "rows": rows,
+    }
+
+
+def save_model_predictions(rows, probs, labels, source_name, model_name):
+    preds_all = probs.argmax(dim=1).tolist()
+
+    output_rows = []
+    for i, row in enumerate(rows):
+        output_row = row.copy()
+        pred_index = preds_all[i]
+        output_row["pred_label"] = pred_index
+        output_row["pred_dx"] = labels[pred_index]
+        output_row["correct"] = int(pred_index == output_row["true_label"])
+        output_row["pred_binary"] = "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign"
+        output_row["binary_correct"] = int(output_row["true_binary"] == output_row["pred_binary"])
+
+        for j, label in enumerate(labels):
+            output_row[f"prob_{label}"] = float(probs[i, j])
+
+        output_rows.append(output_row)
+
+    metrics_df = compute_metrics([row["true_label"] for row in output_rows], preds_all, labels)
 
     os.makedirs(PRED_DIR, exist_ok=True)
     predictions_path = os.path.join(
         PRED_DIR,
-        f"pad_ufes_20_{source_name}_{model_spec['name']}_predictions.csv",
+        f"pad_ufes_20_{source_name}_{model_name}_predictions.csv",
     )
     metrics_path = os.path.join(
         PRED_DIR,
-        f"pad_ufes_20_{source_name}_{model_spec['name']}_metrics.csv",
+        f"pad_ufes_20_{source_name}_{model_name}_metrics.csv",
     )
 
-    pred_df.to_csv(predictions_path, index=False)
+    pd.DataFrame(output_rows).to_csv(predictions_path, index=False)
     metrics_df.to_csv(metrics_path, index=False)
 
     print(f"Saved predictions to {predictions_path}")
     print(f"Saved metrics to {metrics_path}")
+
+
+def evaluate_model(model_spec, df, source_name, device):
+    result = predict_model(model_spec, df, device)
+
+    if result is None:
+        return None
+
+    save_model_predictions(
+        result["rows"],
+        result["probs"],
+        result["labels"],
+        source_name,
+        model_spec["name"],
+    )
+
+    return result
+
+
+def evaluate_ensemble(model_results, source_name):
+    model_results = [result for result in model_results if result is not None]
+
+    if len(model_results) < 2:
+        print(f"Skipping {source_name} ensemble because fewer than two models are available.")
+        return
+
+    labels = model_results[0]["labels"]
+    rows = model_results[0]["rows"]
+    matching_results = [
+        result for result in model_results
+        if result["labels"] == labels and result["probs"].shape[0] == len(rows)
+    ]
+
+    if len(matching_results) < 2:
+        print(f"Skipping {source_name} ensemble because fewer than two compatible models are available.")
+        return
+
+    probs = torch.stack([result["probs"] for result in matching_results], dim=0).mean(dim=0)
+
+    save_model_predictions(rows, probs, labels, source_name, "ensemble")
 
 
 def evaluate_pad_ufes20(image_source):
@@ -340,6 +416,10 @@ def evaluate_pad_ufes20(image_source):
     if torch.cuda.is_available():
         print("GPU:", torch.cuda.get_device_name(0))
 
+    results = []
     for model_spec in model_specs(image_source):
         print(f"Evaluating {model_spec['name']}")
-        evaluate_model(model_spec, df, source_name, device)
+        results.append(evaluate_model(model_spec, df, source_name, device))
+
+    print(f"Evaluating {source_name} ensemble")
+    evaluate_ensemble(results, source_name)

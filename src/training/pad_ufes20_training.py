@@ -6,6 +6,7 @@ import wandb
 
 from torch import nn
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
 from training.ham10000_training import (
@@ -35,7 +36,7 @@ SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
 
-image_size = 128
+image_size = 224
 learning_rate = 3e-4
 
 
@@ -137,6 +138,7 @@ def train_pad_ufes20_full_image_resnet():
         "num_workers": num_workers,
         "class_weights": class_weights,
         "class_weight_note": "inverse frequency weights normalized to mean 1",
+        "scheduler": "cosine_annealing_lr",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
@@ -156,7 +158,11 @@ def train_pad_ufes20_full_image_resnet():
 
     weight_tensor = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=weight_tensor)
-    optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    optimizer = AdamW(trainable_parameters, lr=learning_rate, weight_decay=1e-4)
+    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+
+    print(f"Trainable parameters: {sum(parameter.numel() for parameter in trainable_parameters)}")
 
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(PRED_DIR, exist_ok=True)
@@ -186,7 +192,7 @@ def train_pad_ufes20_full_image_resnet():
             COMMON_LABELS,
         )
 
-        log_row = {"epoch": epoch}
+        log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
         log_row.update(wandb_metrics("train", train_metrics))
         log_row.update(wandb_metrics("val", val_metrics))
         wandb.log(log_row)
@@ -201,6 +207,7 @@ def train_pad_ufes20_full_image_resnet():
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
                 "labels": COMMON_LABELS,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
                 "class_weights": class_weights,
@@ -239,6 +246,8 @@ def train_pad_ufes20_full_image_resnet():
             print(f"Saved new best model: val_macro_f1={val_metrics['macro_f1']:.4f}")
         else:
             epochs_without_improvement += 1
+
+        scheduler.step()
 
         if epochs_without_improvement >= patience:
             print(f"Early stopping triggered after {epoch} epochs.")

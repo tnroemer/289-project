@@ -1,6 +1,7 @@
 import torch
 
 from torch import nn
+from torchvision import models
 
 
 class ConvBlock(nn.Module):
@@ -55,8 +56,8 @@ class BasicVIT(nn.Module):
     def __init__(
         self,
         num_classes,
-        image_size=96,
-        patch_size=8,
+        image_size=224,
+        patch_size=16,
         embed_dim=192,
         depth=6,
         num_heads=6,
@@ -214,6 +215,35 @@ class SimpleResNet(nn.Module):
         return x
 
 
+def build_pretrained_resnet50(num_classes, use_pretrained=True):
+    try:
+        if hasattr(models, "ResNet50_Weights"):
+            weights = models.ResNet50_Weights.DEFAULT if use_pretrained else None
+            model = models.resnet50(weights=weights)
+        else:
+            model = models.resnet50(pretrained=use_pretrained)
+    except Exception as error:
+        if use_pretrained:
+            raise RuntimeError(
+                "Could not load ImageNet ResNet50 weights. "
+                "Make sure the weights are available on the compute server before training."
+            ) from error
+
+        try:
+            model = models.resnet50(weights=None)
+        except TypeError:
+            model = models.resnet50(pretrained=False)
+
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    model.freeze_backbone = True
+
+    return model
+
+
 def build_model(model_type, num_classes, config=None):
     config = config or {}
 
@@ -223,8 +253,8 @@ def build_model(model_type, num_classes, config=None):
     if model_type == "vit":
         return BasicVIT(
             num_classes=num_classes,
-            image_size=config.get("image_size", 96),
-            patch_size=config.get("patch_size", 8),
+            image_size=config.get("image_size", 224),
+            patch_size=config.get("patch_size", 16),
             embed_dim=config.get("embed_dim", 192),
             depth=config.get("depth", 6),
             num_heads=config.get("num_heads", 6),
@@ -234,5 +264,11 @@ def build_model(model_type, num_classes, config=None):
 
     if model_type == "resnet":
         return SimpleResNet(num_classes=num_classes)
+
+    if model_type == "pretrained_resnet50":
+        return build_pretrained_resnet50(
+            num_classes=num_classes,
+            use_pretrained=config.get("use_pretrained_backbone", False),
+        )
 
     raise ValueError(f"Unknown model type: {model_type}")

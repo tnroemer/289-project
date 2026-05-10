@@ -1,0 +1,5 @@
+from training.ham10000_training import train_ham10000_model
+
+
+if __name__ == "__main__":
+    train_ham10000_model(model_type="pretrained_resnet50", image_source="full_image")
