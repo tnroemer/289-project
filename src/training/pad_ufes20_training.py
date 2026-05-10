@@ -10,28 +10,25 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
 from training.ham10000_training import (
-    COMMON_LABELS,
+    BINARY_LABELS,
     HAM_BINARY_LABELS,
-    MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
     MALIGNANT_LABELS,
     OVERLAP_LABELS,
     TARGET_SENSITIVITY,
     TRAIN_AUGMENTATION_NOTE,
     SkinLesionDataset,
-    apply_temperature,
     batch_size,
     choose_threshold_for_sensitivity,
     collect_logits,
-    compute_class_weights,
+    compute_pos_weight,
     evaluate,
-    fit_temperature,
     load_checkpoint,
-    malignant_scores_from_probs,
     make_transforms,
     num_epochs,
     num_workers,
     print_epoch,
     save_predictions,
+    scores_from_logits,
     seed,
     train_one_epoch,
     wandb_metrics,
@@ -61,12 +58,14 @@ def load_pad_split(split_name):
     df = pd.read_csv(split_path)
 
     if "dx" not in df.columns:
-        df["dx"] = df["common_label"].str.lower()
+        raise ValueError(
+            f"Missing dx column in {split_path}. "
+            "Run `sbatch submit/submit_create_data.sh` to rebuild binary metadata."
+        )
 
     df["dx"] = df["dx"].astype(str).str.lower()
     df = df[df["dx"].isin(OVERLAP_LABELS)].copy().reset_index(drop=True)
-    label_to_id = {label: i for i, label in enumerate(COMMON_LABELS)}
-    df["common_label"] = df["dx"]
+    label_to_id = {label: i for i, label in enumerate(BINARY_LABELS)}
     df["binary_class"] = df["dx"].map(HAM_BINARY_LABELS)
     df["binary_label"] = df["binary_class"].map(label_to_id)
     df["label"] = df["binary_label"]
@@ -101,13 +100,13 @@ def train_pad_ufes20_full_image_resnet():
     val_ds = SkinLesionDataset(val_df, val_transform)
     test_ds = SkinLesionDataset(test_df, val_transform)
 
-    class_weights = compute_class_weights(train_df, COMMON_LABELS)
+    pos_weight = compute_pos_weight(train_df)
 
     print("PAD-UFES-20 train counts:")
     print(train_df["dx"].value_counts().sort_index())
-    print("Class weights:")
-    for label, weight in zip(COMMON_LABELS, class_weights):
-        print(f"{label}: {weight:.4f}")
+    print("PAD-UFES-20 binary train counts:")
+    print(train_df["binary_class"].value_counts().sort_index())
+    print(f"BCE pos_weight (negatives / positives): {pos_weight:.4f}")
 
     train_loader = DataLoader(
         train_ds,
@@ -143,7 +142,7 @@ def train_pad_ufes20_full_image_resnet():
         "dataset": "PAD-UFES-20",
         "target": "binary_benign_malignant_overlap_labels",
         "overlap_labels": OVERLAP_LABELS,
-        "labels": COMMON_LABELS,
+        "labels": BINARY_LABELS,
         "malignant_labels": sorted(MALIGNANT_LABELS),
         "image_source": "full_image",
         "run_dir": RUN_DIR,
@@ -152,24 +151,21 @@ def train_pad_ufes20_full_image_resnet():
         "learning_rate": learning_rate,
         "epochs": num_epochs,
         "image_size": image_size,
-        "num_classes": len(COMMON_LABELS),
+        "num_classes": 1,
         "num_workers": num_workers,
-        "class_weights": class_weights,
-        "class_weight_note": (
-            "inverse frequency weights with malignant classes multiplied by "
-            f"{MALIGNANT_CLASS_WEIGHT_MULTIPLIER}, normalized to mean 1"
-        ),
-        "malignant_class_weight_multiplier": MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
+        "loss": "BCEWithLogitsLoss",
+        "pos_weight": pos_weight,
+        "pos_weight_note": "number of benign training examples divided by number of malignant training examples",
         "scheduler": "cosine_annealing_lr",
         "target_sensitivity": TARGET_SENSITIVITY,
-        "calibration": "temperature_scaling_on_validation_logits",
+        "threshold_selection": "validation_threshold_for_target_sensitivity_after_training",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
         "test_size": len(test_df),
     }
 
-    model = build_model("resnet", num_classes=len(COMMON_LABELS), config=config).to(device)
+    model = build_model("resnet", num_classes=1, config=config).to(device)
 
     if "WANDB_API_KEY" in os.environ:
         wandb.login(key=os.environ["WANDB_API_KEY"])
@@ -180,8 +176,8 @@ def train_pad_ufes20_full_image_resnet():
         config=config,
     )
 
-    weight_tensor = torch.tensor(class_weights, dtype=torch.float32, device=device)
-    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+    pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32, device=device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
     trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = AdamW(trainable_parameters, lr=learning_rate, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
@@ -206,14 +202,14 @@ def train_pad_ufes20_full_image_resnet():
             optimizer,
             criterion,
             device,
-            COMMON_LABELS,
+            BINARY_LABELS,
         )
         val_metrics = evaluate(
             model,
             val_loader,
             criterion,
             device,
-            COMMON_LABELS,
+            BINARY_LABELS,
         )
 
         log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
@@ -232,9 +228,9 @@ def train_pad_ufes20_full_image_resnet():
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "scheduler_state_dict": scheduler.state_dict(),
-                "labels": COMMON_LABELS,
+                "labels": BINARY_LABELS,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
-                "class_weights": class_weights,
+                "pos_weight": pos_weight,
                 "val_loss": val_metrics["loss"],
                 "val_accuracy": val_metrics["accuracy"],
                 "val_macro_precision": val_metrics["macro_precision"],
@@ -281,26 +277,21 @@ def train_pad_ufes20_full_image_resnet():
     model.load_state_dict(checkpoint["model_state_dict"])
 
     val_logits, val_targets = collect_logits(model, val_loader, device)
-    temperature = fit_temperature(val_logits, val_targets, device)
-    val_probs = apply_temperature(val_logits, temperature)
-    val_scores = malignant_scores_from_probs(val_probs, COMMON_LABELS, MALIGNANT_LABELS)
+    val_scores = scores_from_logits(val_logits)
     malignant_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
         val_targets,
         val_scores.tolist(),
-        COMMON_LABELS,
+        BINARY_LABELS,
         MALIGNANT_LABELS,
         TARGET_SENSITIVITY,
     )
 
-    checkpoint["temperature"] = temperature
     checkpoint["malignant_threshold"] = malignant_threshold
     checkpoint["target_sensitivity"] = TARGET_SENSITIVITY
     checkpoint["val_operating_metrics"] = val_operating_metrics
-    checkpoint["config"]["temperature"] = temperature
     checkpoint["config"]["malignant_threshold"] = malignant_threshold
     torch.save(checkpoint, best_model_path)
 
-    print(f"Validation temperature: {temperature:.4f}")
     print(f"Validation operating threshold: {malignant_threshold:.4f}")
     print(f"Validation operating malignant recall: {val_operating_metrics['malignant_recall']:.4f}")
     print(f"Validation operating malignant specificity: {val_operating_metrics['malignant_specificity']:.4f}")
@@ -310,7 +301,6 @@ def train_pad_ufes20_full_image_resnet():
         for name, value in val_operating_metrics.items()
         if isinstance(value, (int, float))
     }
-    val_operating_log["val_operating/temperature"] = temperature
     wandb.log(val_operating_log)
 
     test_metrics = save_predictions(
@@ -318,10 +308,9 @@ def train_pad_ufes20_full_image_resnet():
         test_loader,
         criterion,
         device,
-        COMMON_LABELS,
+        BINARY_LABELS,
         predictions_path,
         metrics_path,
-        temperature=temperature,
         malignant_threshold=malignant_threshold,
     )
 
@@ -337,7 +326,6 @@ def train_pad_ufes20_full_image_resnet():
     wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
     wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
     wandb.run.summary["operating_threshold"] = malignant_threshold
-    wandb.run.summary["temperature"] = temperature
     wandb.run.summary["test_operating_malignant_recall"] = test_metrics["operating_malignant_recall"]
     wandb.run.summary["test_operating_malignant_specificity"] = test_metrics["operating_malignant_specificity"]
 

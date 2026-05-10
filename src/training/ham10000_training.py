@@ -21,7 +21,7 @@ CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
 
 OVERLAP_LABELS = ["akiec", "bcc", "bkl", "mel", "nv"]
-COMMON_LABELS = ["benign", "malignant"]
+BINARY_LABELS = ["benign", "malignant"]
 MALIGNANT_LABELS = {"malignant"}
 HAM_BINARY_LABELS = {
     "akiec": "malignant",
@@ -35,7 +35,6 @@ TRAIN_AUGMENTATION_NOTE = (
     "resize, random resized crop, flips, rotation, affine translation/scale/shear, "
     "mild perspective, color jitter, occasional grayscale, and mild blur"
 )
-MALIGNANT_CLASS_WEIGHT_MULTIPLIER = 1.5
 
 batch_size = 32
 num_epochs = 60
@@ -115,13 +114,8 @@ def load_checkpoint(path, device):
         return torch.load(path, map_location=device)
 
 
-def apply_temperature(logits, temperature):
-    return torch.softmax(logits / temperature, dim=1)
-
-
-def malignant_scores_from_probs(probs, labels, malignant_labels):
-    malignant_indices = [i for i, label in enumerate(labels) if label in malignant_labels]
-    return probs[:, malignant_indices].sum(dim=1)
+def scores_from_logits(logits):
+    return torch.sigmoid(logits.view(-1))
 
 
 def binary_metrics_from_scores(targets, scores, labels, malignant_labels, threshold):
@@ -160,6 +154,8 @@ def binary_metrics_from_scores(targets, scores, labels, malignant_labels, thresh
         "binary_macro_recall": (malignant_recall + benign_recall) / 2,
         "binary_macro_f1": (malignant_f1 + benign_f1) / 2,
         "binary_balanced_accuracy": (malignant_recall + benign_recall) / 2,
+        "sensitivity": malignant_recall,
+        "specificity": malignant_specificity,
         "malignant_precision": malignant_precision,
         "malignant_recall": malignant_recall,
         "malignant_specificity": malignant_specificity,
@@ -199,26 +195,7 @@ def choose_threshold_for_sensitivity(targets, scores, labels, malignant_labels, 
     return best_metrics["threshold"], best_metrics
 
 
-def fit_temperature(logits, targets, device):
-    logits = logits.detach().to(device)
-    targets = torch.tensor(targets, dtype=torch.long, device=device)
-    log_temperature = torch.zeros(1, device=device, requires_grad=True)
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.LBFGS([log_temperature], lr=0.1, max_iter=50)
-
-    def closure():
-        optimizer.zero_grad()
-        temperature = torch.clamp(torch.exp(log_temperature), 0.05, 10.0)
-        loss = criterion(logits / temperature, targets)
-        loss.backward()
-        return loss
-
-    optimizer.step(closure)
-    temperature = torch.clamp(torch.exp(log_temperature), 0.05, 10.0).item()
-    return float(temperature)
-
-
-def operating_metrics_to_rows(metrics, temperature=None):
+def operating_metrics_to_rows(metrics):
     rows = []
 
     for name, value in metrics.items():
@@ -226,13 +203,6 @@ def operating_metrics_to_rows(metrics, temperature=None):
             "metric": f"operating_{name}",
             "class": "operating_point",
             "value": value,
-        })
-
-    if temperature is not None:
-        rows.append({
-            "metric": "operating_temperature",
-            "class": "operating_point",
-            "value": temperature,
         })
 
     return rows
@@ -290,13 +260,15 @@ def load_split(split_name, image_source):
 
     df = pd.read_csv(split_path)
 
-    if "dx" not in df.columns and "common_label" in df.columns:
-        df["dx"] = df["common_label"]
+    if "dx" not in df.columns:
+        raise ValueError(
+            f"Missing dx column in {split_path}. "
+            "Run `sbatch submit/submit_create_data.sh` to rebuild binary metadata."
+        )
 
     df["dx"] = df["dx"].astype(str).str.lower()
     df = df[df["dx"].isin(OVERLAP_LABELS)].copy().reset_index(drop=True)
-    label_to_id = {label: i for i, label in enumerate(COMMON_LABELS)}
-    df["common_label"] = df["dx"]
+    label_to_id = {label: i for i, label in enumerate(BINARY_LABELS)}
     df["binary_class"] = df["dx"].map(HAM_BINARY_LABELS)
     df["binary_label"] = df["binary_class"].map(label_to_id)
     df["label"] = df["binary_label"]
@@ -320,25 +292,16 @@ def load_split(split_name, image_source):
     return df
 
 
-def compute_class_weights(train_df, labels):
-    train_labels = train_df["label"].tolist()
-    counts = pd.Series(train_labels).value_counts().to_dict()
-    raw_weights = []
+def compute_pos_weight(train_df):
+    positives = int((train_df["label"] == 1).sum())
+    negatives = int((train_df["label"] == 0).sum())
 
-    for i, label in enumerate(labels):
-        count = counts.get(i, 0)
-        if count == 0:
-            raise ValueError(f"No training examples for class {label}")
+    if positives == 0:
+        raise ValueError("No malignant training examples found.")
+    if negatives == 0:
+        raise ValueError("No benign training examples found.")
 
-        frequency_weight = len(train_labels) / (len(labels) * count)
-        if label in MALIGNANT_LABELS:
-            frequency_weight *= MALIGNANT_CLASS_WEIGHT_MULTIPLIER
-        raw_weights.append(frequency_weight)
-
-    mean_weight = sum(raw_weights) / len(raw_weights)
-    class_weights = [weight / mean_weight for weight in raw_weights]
-
-    return class_weights
+    return negatives / positives
 
 
 def prepare_datasets(image_source, image_size):
@@ -352,15 +315,15 @@ def prepare_datasets(image_source, image_size):
     val_ds = SkinLesionDataset(val_df, val_transform)
     test_ds = SkinLesionDataset(test_df, val_transform)
 
-    class_weights = compute_class_weights(train_df, COMMON_LABELS)
+    pos_weight = compute_pos_weight(train_df)
 
     print("Train counts:")
     print(train_df["dx"].value_counts().sort_index())
-    print("Class weights:")
-    for label, weight in zip(COMMON_LABELS, class_weights):
-        print(f"{label}: {weight:.4f}")
+    print("Binary train counts:")
+    print(train_df["binary_class"].value_counts().sort_index())
+    print(f"BCE pos_weight (negatives / positives): {pos_weight:.4f}")
 
-    return train_ds, val_ds, test_ds, train_df, val_df, test_df, class_weights
+    return train_ds, val_ds, test_ds, train_df, val_df, test_df, pos_weight
 
 
 def compute_metrics(targets, preds, labels):
@@ -489,13 +452,13 @@ def train_one_epoch(model, loader, optimizer, criterion, device, labels):
 
         optimizer.zero_grad(set_to_none=True)
 
-        outputs = model(images)
-        loss = criterion(outputs, labels_batch)
+        logits = model(images).view(-1)
+        loss = criterion(logits, labels_batch.float())
 
         loss.backward()
         optimizer.step()
 
-        preds = outputs.argmax(dim=1)
+        preds = (scores_from_logits(logits) >= 0.5).long()
 
         total_loss += loss.item() * images.size(0)
         total += labels_batch.size(0)
@@ -521,9 +484,9 @@ def evaluate(model, loader, criterion, device, labels):
             images = batch["pixel_values"].to(device, non_blocking=True)
             labels_batch = batch["labels"].to(device, non_blocking=True)
 
-            outputs = model(images)
-            loss = criterion(outputs, labels_batch)
-            preds = outputs.argmax(dim=1)
+            logits = model(images).view(-1)
+            loss = criterion(logits, labels_batch.float())
+            preds = (scores_from_logits(logits) >= 0.5).long()
 
             total_loss += loss.item() * images.size(0)
             total += labels_batch.size(0)
@@ -546,7 +509,7 @@ def collect_logits(model, loader, device):
         for batch in loader:
             images = batch["pixel_values"].to(device, non_blocking=True)
             labels_batch = batch["labels"].to(device, non_blocking=True)
-            outputs = model(images)
+            outputs = model(images).view(-1)
 
             logits.append(outputs.cpu())
             targets.extend(labels_batch.cpu().tolist())
@@ -593,10 +556,7 @@ def write_metrics_csv(metrics, labels, metrics_path, operating_metrics=None):
         rows.append({"metric": f"confusion_{name}", "class": "overall", "value": value})
 
     if operating_metrics is not None:
-        rows.extend(operating_metrics_to_rows(
-            operating_metrics["metrics"],
-            temperature=operating_metrics["temperature"],
-        ))
+        rows.extend(operating_metrics_to_rows(operating_metrics["metrics"]))
 
     pd.DataFrame(rows).to_csv(metrics_path, index=False)
 
@@ -609,7 +569,6 @@ def save_predictions(
     labels,
     predictions_path,
     metrics_path,
-    temperature=1.0,
     malignant_threshold=None,
 ):
     model.eval()
@@ -626,11 +585,14 @@ def save_predictions(
             images = batch["pixel_values"].to(device, non_blocking=True)
             labels_batch = batch["labels"].to(device, non_blocking=True)
 
-            outputs = model(images)
-            loss = criterion(outputs, labels_batch)
-            probs = apply_temperature(outputs, temperature)
-            preds = outputs.argmax(dim=1)
-            malignant_scores = malignant_scores_from_probs(probs, labels, MALIGNANT_LABELS)
+            logits = model(images).view(-1)
+            loss = criterion(logits, labels_batch.float())
+            malignant_scores = scores_from_logits(logits)
+            default_preds = (malignant_scores >= 0.5).long()
+            if malignant_threshold is None:
+                preds = default_preds
+            else:
+                preds = (malignant_scores >= malignant_threshold).long()
 
             total_loss += loss.item() * images.size(0)
             total += labels_batch.size(0)
@@ -638,43 +600,40 @@ def save_predictions(
             all_preds.extend(preds.cpu().tolist())
             all_malignant_scores.extend(malignant_scores.cpu().tolist())
 
-            probs_cpu = probs.cpu()
+            default_preds_cpu = default_preds.cpu()
             preds_cpu = preds.cpu()
             labels_cpu = labels_batch.cpu()
             malignant_scores_cpu = malignant_scores.cpu()
 
             for i in range(images.size(0)):
+                default_index = int(default_preds_cpu[i])
                 pred_index = int(preds_cpu[i])
                 true_index = int(labels_cpu[i])
                 malignant_score = float(malignant_scores_cpu[i])
-                threshold_pred_binary = None
-                threshold_correct = None
-
-                if malignant_threshold is not None:
-                    threshold_pred_binary = "malignant" if malignant_score >= malignant_threshold else "benign"
-                    true_binary = "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign"
-                    threshold_correct = int(true_binary == threshold_pred_binary)
+                threshold_pred_binary = labels[pred_index]
+                threshold_correct = int(true_index == pred_index)
 
                 row = {
                     "image_id": batch["image_id"][i],
                     "image_path": batch["image_path"][i],
                     "true_label": true_index,
                     "true_dx": batch["dx"][i],
+                    "default_label": default_index,
+                    "default_dx": labels[default_index],
+                    "default_correct": int(default_index == true_index),
                     "pred_label": pred_index,
                     "pred_dx": labels[pred_index],
                     "correct": int(pred_index == true_index),
                     "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
                     "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
                     "malignant_score": malignant_score,
+                    "prob_benign": 1.0 - malignant_score,
+                    "prob_malignant": malignant_score,
                     "operating_threshold": malignant_threshold,
-                    "temperature": temperature,
                     "pred_binary_threshold": threshold_pred_binary,
                     "binary_threshold_correct": threshold_correct,
                 }
                 row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
-
-                for j, label in enumerate(labels):
-                    row[f"prob_{label}"] = float(probs_cpu[i, j])
 
                 rows.append(row)
 
@@ -690,10 +649,9 @@ def save_predictions(
             MALIGNANT_LABELS,
             malignant_threshold,
         )
-        operating_metrics = {"metrics": threshold_metrics, "temperature": temperature}
+        operating_metrics = {"metrics": threshold_metrics}
         for name, value in threshold_metrics.items():
             metrics[f"operating_{name}"] = value
-        metrics["operating_temperature"] = temperature
 
     pd.DataFrame(rows).to_csv(predictions_path, index=False)
     write_metrics_csv(metrics, labels, metrics_path, operating_metrics=operating_metrics)
@@ -708,7 +666,6 @@ def save_predictions(
     print(f"Test Malignant Specificity: {metrics['malignant_specificity']:.4f}")
     if malignant_threshold is not None:
         print(f"Operating Threshold: {malignant_threshold:.4f}")
-        print(f"Temperature: {temperature:.4f}")
         print(f"Operating Malignant Recall: {metrics['operating_malignant_recall']:.4f}")
         print(f"Operating Malignant Specificity: {metrics['operating_malignant_specificity']:.4f}")
     print(f"Saved predictions to {predictions_path}")
@@ -782,7 +739,7 @@ def train_ham10000_model(model_type, image_source):
         wandb_name = f"{settings['display_name']}-lesion-white"
         dataset_name = "HAM10000-lesion-white"
 
-    train_ds, val_ds, test_ds, train_df, val_df, test_df, class_weights = prepare_datasets(
+    train_ds, val_ds, test_ds, train_df, val_df, test_df, pos_weight = prepare_datasets(
         image_source,
         image_size,
     )
@@ -820,7 +777,7 @@ def train_ham10000_model(model_type, image_source):
         "dataset": dataset_name,
         "target": "binary_benign_malignant_overlap_labels",
         "overlap_labels": OVERLAP_LABELS,
-        "labels": COMMON_LABELS,
+        "labels": BINARY_LABELS,
         "malignant_labels": sorted(MALIGNANT_LABELS),
         "image_source": image_source,
         "run_dir": RUN_DIR,
@@ -829,17 +786,14 @@ def train_ham10000_model(model_type, image_source):
         "learning_rate": learning_rate,
         "epochs": num_epochs,
         "image_size": image_size,
-        "num_classes": len(COMMON_LABELS),
+        "num_classes": 1,
         "num_workers": num_workers,
-        "class_weights": class_weights,
-        "class_weight_note": (
-            "inverse frequency weights with malignant classes multiplied by "
-            f"{MALIGNANT_CLASS_WEIGHT_MULTIPLIER}, normalized to mean 1"
-        ),
-        "malignant_class_weight_multiplier": MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
+        "loss": "BCEWithLogitsLoss",
+        "pos_weight": pos_weight,
+        "pos_weight_note": "number of benign training examples divided by number of malignant training examples",
         "scheduler": "cosine_annealing_lr",
         "target_sensitivity": TARGET_SENSITIVITY,
-        "calibration": "temperature_scaling_on_validation_logits",
+        "threshold_selection": "validation_threshold_for_target_sensitivity_after_training",
         "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
@@ -861,7 +815,7 @@ def train_ham10000_model(model_type, image_source):
         if key in settings:
             config[key] = settings[key]
 
-    model = build_model(model_type, num_classes=len(COMMON_LABELS), config=config).to(device)
+    model = build_model(model_type, num_classes=1, config=config).to(device)
 
     if "WANDB_API_KEY" in os.environ:
         wandb.login(key=os.environ["WANDB_API_KEY"])
@@ -872,8 +826,8 @@ def train_ham10000_model(model_type, image_source):
         config=config,
     )
 
-    weight_tensor = torch.tensor(class_weights, dtype=torch.float32, device=device)
-    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+    pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32, device=device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
     if model_type == "pretrained_resnet50" and settings.get("finetune") == "head_then_layer4":
         head_parameters = [parameter for parameter in model.fc.parameters() if parameter.requires_grad]
@@ -924,14 +878,14 @@ def train_ham10000_model(model_type, image_source):
             optimizer,
             criterion,
             device,
-            COMMON_LABELS,
+            BINARY_LABELS,
         )
         val_metrics = evaluate(
             model,
             val_loader,
             criterion,
             device,
-            COMMON_LABELS,
+            BINARY_LABELS,
         )
 
         log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
@@ -950,9 +904,9 @@ def train_ham10000_model(model_type, image_source):
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "scheduler_state_dict": scheduler.state_dict(),
-                "labels": COMMON_LABELS,
+                "labels": BINARY_LABELS,
                 "malignant_labels": sorted(MALIGNANT_LABELS),
-                "class_weights": class_weights,
+                "pos_weight": pos_weight,
                 "val_loss": val_metrics["loss"],
                 "val_accuracy": val_metrics["accuracy"],
                 "val_macro_precision": val_metrics["macro_precision"],
@@ -999,26 +953,21 @@ def train_ham10000_model(model_type, image_source):
     model.load_state_dict(checkpoint["model_state_dict"])
 
     val_logits, val_targets = collect_logits(model, val_loader, device)
-    temperature = fit_temperature(val_logits, val_targets, device)
-    val_probs = apply_temperature(val_logits, temperature)
-    val_scores = malignant_scores_from_probs(val_probs, COMMON_LABELS, MALIGNANT_LABELS)
+    val_scores = scores_from_logits(val_logits)
     malignant_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
         val_targets,
         val_scores.tolist(),
-        COMMON_LABELS,
+        BINARY_LABELS,
         MALIGNANT_LABELS,
         TARGET_SENSITIVITY,
     )
 
-    checkpoint["temperature"] = temperature
     checkpoint["malignant_threshold"] = malignant_threshold
     checkpoint["target_sensitivity"] = TARGET_SENSITIVITY
     checkpoint["val_operating_metrics"] = val_operating_metrics
-    checkpoint["config"]["temperature"] = temperature
     checkpoint["config"]["malignant_threshold"] = malignant_threshold
     torch.save(checkpoint, best_model_path)
 
-    print(f"Validation temperature: {temperature:.4f}")
     print(f"Validation operating threshold: {malignant_threshold:.4f}")
     print(f"Validation operating malignant recall: {val_operating_metrics['malignant_recall']:.4f}")
     print(f"Validation operating malignant specificity: {val_operating_metrics['malignant_specificity']:.4f}")
@@ -1028,7 +977,6 @@ def train_ham10000_model(model_type, image_source):
         for name, value in val_operating_metrics.items()
         if isinstance(value, (int, float))
     }
-    val_operating_log["val_operating/temperature"] = temperature
     wandb.log(val_operating_log)
 
     test_metrics = save_predictions(
@@ -1036,10 +984,9 @@ def train_ham10000_model(model_type, image_source):
         test_loader,
         criterion,
         device,
-        COMMON_LABELS,
+        BINARY_LABELS,
         predictions_path,
         metrics_path,
-        temperature=temperature,
         malignant_threshold=malignant_threshold,
     )
 
@@ -1055,7 +1002,6 @@ def train_ham10000_model(model_type, image_source):
     wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
     wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
     wandb.run.summary["operating_threshold"] = malignant_threshold
-    wandb.run.summary["temperature"] = temperature
     wandb.run.summary["test_operating_malignant_recall"] = test_metrics["operating_malignant_recall"]
     wandb.run.summary["test_operating_malignant_specificity"] = test_metrics["operating_malignant_specificity"]
 

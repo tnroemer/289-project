@@ -130,7 +130,6 @@ def create_ham10000_data():
 
     label_to_id = {label: i for i, label in enumerate(BINARY_LABELS)}
 
-    df["common_label"] = df["dx"]
     df["binary_class"] = df["dx"].map(HAM_BINARY_LABELS)
     df["binary_label"] = df["binary_class"].map(label_to_id)
     df["label"] = df["binary_label"]
@@ -173,7 +172,6 @@ def create_ham10000_data():
         "image_id",
         "lesion_id",
         "dx",
-        "common_label",
         "binary_class",
         "binary_label",
         "label",
@@ -217,7 +215,7 @@ def create_ham10000_data():
     all_df.to_csv(all_path, index=False)
     all_df.to_csv(HAM_METADATA_PATH, index=False)
 
-    print("Created HAM10000 common-label image folder and splits")
+    print("Created HAM10000 binary image folder and splits")
     print(f"Metadata path: {metadata_path}")
     print(f"Copied HAM images: {copied}")
     print(f"Already existed: {skipped_existing}")
@@ -322,9 +320,9 @@ def create_pad_ufes20_data():
 
     df = pd.read_csv(metadata_path)
     df["diagnostic"] = df["diagnostic"].astype(str).str.upper()
-    df["common_label"] = df["diagnostic"].map(PAD_TO_HAM_LABELS)
-    df = df.dropna(subset=["common_label"]).copy().reset_index(drop=True)
-    df["binary_class"] = df["common_label"].map(HAM_BINARY_LABELS)
+    df["dx"] = df["diagnostic"].map(PAD_TO_HAM_LABELS)
+    df = df.dropna(subset=["dx"]).copy().reset_index(drop=True)
+    df["binary_class"] = df["dx"].map(HAM_BINARY_LABELS)
     df["binary_label"] = df["binary_class"].map(label_to_id)
     df["label"] = df["binary_label"]
 
@@ -361,14 +359,13 @@ def create_pad_ufes20_data():
         rows.append(output_row)
 
     manifest_df = pd.DataFrame(rows)
-    manifest_df["dx"] = manifest_df["common_label"].str.lower()
     manifest_df.to_csv(PAD_METADATA_PATH, index=False)
 
     train_parts = []
     val_parts = []
     test_parts = []
 
-    for _, group in manifest_df.groupby("common_label"):
+    for _, group in manifest_df.groupby("dx"):
         train_df, val_df, test_df = split_group(group)
         train_parts.append(train_df)
         val_parts.append(val_df)
@@ -394,24 +391,24 @@ def create_pad_ufes20_data():
     test_df.to_csv(test_path, index=False)
     pd.concat([train_df, val_df, test_df]).to_csv(all_path, index=False)
 
-    print("Created PAD-UFES-20 common-label image folder and splits")
+    print("Created PAD-UFES-20 binary image folder and splits")
     print(f"Metadata path: {metadata_path}")
-    print(f"Common HAM/PAD labels: {OVERLAP_LABELS}")
+    print(f"Kept overlap diagnoses: {OVERLAP_LABELS}")
     print("PAD mapping:", PAD_TO_HAM_LABELS)
     print("Binary mapping:", HAM_BINARY_LABELS)
     print(f"Copied PAD images: {copied}")
     print(f"Already existed: {skipped_existing}")
     print(f"Missing PAD source images: {missing_images}")
     print("PAD counts:")
-    print(manifest_df["common_label"].value_counts().sort_index())
+    print(manifest_df["dx"].value_counts().sort_index())
     print("PAD binary counts:")
     print(manifest_df["binary_class"].value_counts().sort_index())
     print("Train counts:")
-    print(train_df["common_label"].value_counts().sort_index())
+    print(train_df["dx"].value_counts().sort_index())
     print("Val counts:")
-    print(val_df["common_label"].value_counts().sort_index())
+    print(val_df["dx"].value_counts().sort_index())
     print("Test counts:")
-    print(test_df["common_label"].value_counts().sort_index())
+    print(test_df["dx"].value_counts().sort_index())
     print(f"Output folder: {PAD_IMAGE_DIR}")
     print(f"Saved PAD metadata: {PAD_METADATA_PATH}")
     print(f"Saved train split to {train_path}")
