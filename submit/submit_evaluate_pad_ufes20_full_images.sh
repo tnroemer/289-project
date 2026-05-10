@@ -32,7 +32,6 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /jet/home/troemer/.conda/envs/stat214
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
-PYTHON_BIN="python"
 export PYTHONUNBUFFERED=1
 
 THREADS="${SLURM_CPUS_PER_TASK:-4}"

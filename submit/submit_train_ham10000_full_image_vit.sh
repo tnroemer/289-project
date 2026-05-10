@@ -33,7 +33,6 @@ conda activate /jet/home/troemer/.conda/envs/stat214
 source /ocean/projects/mth250011p/troemer/.wandb_env
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
-PYTHON_BIN="python"
 export PYTHONUNBUFFERED=1
 
 THREADS="${SLURM_CPUS_PER_TASK:-8}"

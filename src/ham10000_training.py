@@ -532,7 +532,7 @@ def train_ham10000_model(model_type, image_source):
     if "WANDB_API_KEY" in os.environ:
         wandb.login(key=os.environ["WANDB_API_KEY"])
 
-    run = wandb.init(
+    wandb.init(
         project="skin-cancer-cnn",
         name=wandb_name,
         config=config,

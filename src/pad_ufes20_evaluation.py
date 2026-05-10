@@ -1,38 +1,26 @@
 import os
-import shutil
-import zipfile
 
-import kagglehub
 import pandas as pd
 import torch
 
 from PIL import Image
-from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
 from model_architectures import build_model
 
 
-os.environ["KAGGLEHUB_CACHE"] = "/ocean/projects/mth250011p/troemer/"
-
 DATA_ROOT = "/ocean/projects/mth250011p/troemer"
 RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
-DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "pad-ufes-20")
 MODEL_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
-EXTRACTED_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-extracted-lesions")
-EXTRACTED_MANIFEST_PATH = os.path.join(EXTRACTED_DIR, "metadata.csv")
+PAD_IMAGE_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
+PAD_IMAGE_METADATA_PATH = os.path.join(PAD_IMAGE_DIR, "metadata.csv")
+PAD_LESION_WHITE_IMAGE_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-lesion-white-images")
+PAD_LESION_WHITE_METADATA_PATH = os.path.join(PAD_LESION_WHITE_IMAGE_DIR, "metadata.csv")
 
 COMMON_LABELS = ["akiec", "bcc", "bkl", "mel", "nv"]
 MALIGNANT_LABELS = {"akiec", "bcc", "mel"}
-PAD_TO_COMMON_LABELS = {
-    "ACK": "akiec",
-    "BCC": "bcc",
-    "SEK": "bkl",
-    "MEL": "mel",
-    "NEV": "nv",
-}
 
 batch_size = 32
 num_workers = 4
@@ -81,81 +69,6 @@ def make_transform(image_size):
             std=[0.229, 0.224, 0.225],
         ),
     ])
-
-
-def download_dataset():
-    if os.path.exists(DATASET_DIR):
-        extract_zip_files(DATASET_DIR)
-        return DATASET_DIR
-
-    path = kagglehub.dataset_download("mahdavi1202/skin-cancer")
-    os.makedirs(DATASET_DIR, exist_ok=True)
-
-    for item in os.listdir(path):
-        source_path = os.path.join(path, item)
-        target_path = os.path.join(DATASET_DIR, item)
-
-        if os.path.isdir(source_path):
-            shutil.copytree(source_path, target_path, dirs_exist_ok=True)
-        elif not os.path.exists(target_path):
-            shutil.copy2(source_path, target_path)
-
-    extract_zip_files(DATASET_DIR)
-
-    return DATASET_DIR
-
-
-def extract_zip_files(dataset_dir):
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            if not filename.lower().endswith(".zip"):
-                continue
-
-            zip_path = os.path.join(root, filename)
-            extract_dir = os.path.join(root, os.path.splitext(filename)[0])
-
-            if os.path.exists(extract_dir):
-                continue
-
-            os.makedirs(extract_dir, exist_ok=True)
-            with zipfile.ZipFile(zip_path, "r") as zip_file:
-                zip_file.extractall(extract_dir)
-
-
-def find_metadata_csv(dataset_dir):
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            if not filename.lower().endswith(".csv"):
-                continue
-
-            csv_path = os.path.join(root, filename)
-            try:
-                df = pd.read_csv(csv_path, nrows=5)
-            except Exception:
-                continue
-
-            columns = set(df.columns)
-            if {"img_id", "diagnostic"}.issubset(columns):
-                return csv_path
-
-    raise FileNotFoundError("Could not find PAD-UFES-20 metadata CSV with img_id and diagnostic columns.")
-
-
-def make_image_index(dataset_dir):
-    image_index = {}
-    image_extensions = {".png", ".jpg", ".jpeg"}
-
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            stem, ext = os.path.splitext(filename)
-            if ext.lower() not in image_extensions:
-                continue
-
-            path = os.path.join(root, filename)
-            image_index[filename] = path
-            image_index[stem] = path
-
-    return image_index
 
 
 def compute_metrics(targets, preds, labels):
@@ -271,61 +184,31 @@ def model_specs(image_source):
     raise ValueError(f"Unknown image_source: {image_source}")
 
 
-def prepare_full_image_df():
-    dataset_dir = download_dataset()
-    metadata_path = find_metadata_csv(dataset_dir)
-    image_index = make_image_index(dataset_dir)
-
-    df = pd.read_csv(metadata_path)
-    df["image_path"] = df["img_id"].apply(
-        lambda x: image_index.get(str(x)) or image_index.get(os.path.splitext(str(x))[0])
-    )
-
-    print(f"Metadata path: {metadata_path}")
-    return df
-
-
-def prepare_extracted_lesion_df():
-    if not os.path.exists(EXTRACTED_MANIFEST_PATH):
-        print(f"Missing extracted lesion manifest: {EXTRACTED_MANIFEST_PATH}")
-        print("Trying to rebuild it from existing extracted PAD-UFES-20 images.")
-
-        df = prepare_full_image_df()
-        df["original_image_path"] = df["image_path"]
-        df["extracted_image_path"] = df["img_id"].apply(
-            lambda x: os.path.join(EXTRACTED_DIR, os.path.splitext(str(x))[0] + ".png")
-        )
-        df = df[df["extracted_image_path"].apply(os.path.exists)].reset_index(drop=True)
-
-        if len(df) == 0:
-            raise FileNotFoundError(
-                "Could not find extracted PAD-UFES-20 lesion images. "
-                "Run `sbatch submit/submit_create_pad_ufes20_extracted_lesions.sh` first, "
-                "then rerun this evaluation job."
-            )
-
-        os.makedirs(EXTRACTED_DIR, exist_ok=True)
-        df.to_csv(EXTRACTED_MANIFEST_PATH, index=False)
-        print(f"Rebuilt extracted lesion manifest: {EXTRACTED_MANIFEST_PATH}")
-    else:
-        df = pd.read_csv(EXTRACTED_MANIFEST_PATH)
-
-    df["image_path"] = df["extracted_image_path"]
-    return df
-
-
 def prepare_pad_df(image_source):
     if image_source == "full_image":
-        df = prepare_full_image_df()
+        if not os.path.exists(PAD_IMAGE_METADATA_PATH):
+            raise FileNotFoundError(
+                f"Missing prepared PAD-UFES-20 metadata: {PAD_IMAGE_METADATA_PATH}. "
+                "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` first."
+            )
+        df = pd.read_csv(PAD_IMAGE_METADATA_PATH)
         source_name = "full_images"
     elif image_source == "lesion_white":
-        df = prepare_extracted_lesion_df()
-        source_name = "extracted_lesions"
+        if not os.path.exists(PAD_LESION_WHITE_METADATA_PATH):
+            raise FileNotFoundError(
+                f"Missing prepared PAD-UFES-20 lesion-white metadata: {PAD_LESION_WHITE_METADATA_PATH}. "
+                "Run `sbatch submit/submit_create_pad_ufes20_lesion_white_images.sh` first."
+            )
+        df = pd.read_csv(PAD_LESION_WHITE_METADATA_PATH)
+        source_name = "lesion_white_images"
     else:
         raise ValueError(f"Unknown image_source: {image_source}")
 
-    df["diagnostic"] = df["diagnostic"].astype(str).str.upper()
-    df["common_label"] = df["diagnostic"].map(PAD_TO_COMMON_LABELS)
+    if "common_label" not in df.columns:
+        raise ValueError(
+            "Prepared PAD-UFES-20 metadata is missing common_label. "
+            "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` to rebuild it."
+        )
 
     missing_images = df["image_path"].isna().sum()
     df = df.dropna(subset=["image_path", "common_label"]).reset_index(drop=True)

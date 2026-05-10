@@ -1,14 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=evaluate_pad_ufes20_extracted_lesions
+#SBATCH --job-name=create_pad_ufes20_lesion_white_images
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
-#SBATCH --partition=GPU-shared
-#SBATCH --gres=gpu:1
+#SBATCH -p RM-shared
 #SBATCH --account=mth250011p
-#SBATCH --nodes=1
+#SBATCH -N 1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=20G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=1900M
 #SBATCH --time=01:00:00
 
 set -euo pipefail
@@ -32,19 +31,18 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /jet/home/troemer/.conda/envs/stat214
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
-PYTHON_BIN="python"
 export PYTHONUNBUFFERED=1
 
-THREADS="${SLURM_CPUS_PER_TASK:-8}"
+THREADS="${SLURM_CPUS_PER_TASK:-16}"
 export OMP_NUM_THREADS="$THREADS"
 export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f evaluate_pad_ufes20_extracted_lesions.py ]]; then
-    SCRIPT_PATH="evaluate_pad_ufes20_extracted_lesions.py"
+if [[ -f create_pad_ufes20_lesion_white_images.py ]]; then
+    SCRIPT_PATH="create_pad_ufes20_lesion_white_images.py"
 else
-    SCRIPT_PATH="src/evaluate_pad_ufes20_extracted_lesions.py"
+    SCRIPT_PATH="src/create_pad_ufes20_lesion_white_images.py"
 fi
 
 /jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"

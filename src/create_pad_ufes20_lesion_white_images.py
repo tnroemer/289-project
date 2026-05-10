@@ -1,8 +1,5 @@
 import os
-import shutil
-import zipfile
 
-import kagglehub
 import numpy as np
 import pandas as pd
 import torch
@@ -12,27 +9,18 @@ from torch import nn
 from torchvision import transforms
 
 
-# -----------------------
-# Global config
-# -----------------------
-
-os.environ["KAGGLEHUB_CACHE"] = "/ocean/projects/mth250011p/troemer/"
-
 DATA_ROOT = "/ocean/projects/mth250011p/troemer"
 RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 
-DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "pad-ufes-20")
+INPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
+INPUT_METADATA_PATH = os.path.join(INPUT_DIR, "metadata.csv")
 MODEL_PATH = os.path.join(RUN_DIR, "models", "segmentation_unet_v2.pth")
-OUTPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-extracted-lesions")
-MANIFEST_PATH = os.path.join(OUTPUT_DIR, "metadata.csv")
+OUTPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-lesion-white-images")
+OUTPUT_METADATA_PATH = os.path.join(OUTPUT_DIR, "metadata.csv")
 
 segmentation_image_size = 256
 mask_threshold = 0.5
 
-
-# -----------------------
-# Model
-# -----------------------
 
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -102,85 +90,6 @@ class UNet(nn.Module):
         return self.final_conv(dec1)
 
 
-# -----------------------
-# Helpers
-# -----------------------
-
-def download_dataset():
-    if os.path.exists(DATASET_DIR):
-        extract_zip_files(DATASET_DIR)
-        return DATASET_DIR
-
-    path = kagglehub.dataset_download("mahdavi1202/skin-cancer")
-    os.makedirs(DATASET_DIR, exist_ok=True)
-
-    for item in os.listdir(path):
-        source_path = os.path.join(path, item)
-        target_path = os.path.join(DATASET_DIR, item)
-
-        if os.path.isdir(source_path):
-            shutil.copytree(source_path, target_path, dirs_exist_ok=True)
-        elif not os.path.exists(target_path):
-            shutil.copy2(source_path, target_path)
-
-    extract_zip_files(DATASET_DIR)
-
-    return DATASET_DIR
-
-
-def extract_zip_files(dataset_dir):
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            if not filename.lower().endswith(".zip"):
-                continue
-
-            zip_path = os.path.join(root, filename)
-            extract_dir = os.path.join(root, os.path.splitext(filename)[0])
-
-            if os.path.exists(extract_dir):
-                continue
-
-            os.makedirs(extract_dir, exist_ok=True)
-            with zipfile.ZipFile(zip_path, "r") as zip_file:
-                zip_file.extractall(extract_dir)
-
-
-def find_metadata_csv(dataset_dir):
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            if not filename.lower().endswith(".csv"):
-                continue
-
-            csv_path = os.path.join(root, filename)
-            try:
-                df = pd.read_csv(csv_path, nrows=5)
-            except Exception:
-                continue
-
-            columns = set(df.columns)
-            if {"img_id", "diagnostic"}.issubset(columns):
-                return csv_path
-
-    raise FileNotFoundError("Could not find PAD-UFES-20 metadata CSV with img_id and diagnostic columns.")
-
-
-def make_image_index(dataset_dir):
-    image_index = {}
-    image_extensions = {".png", ".jpg", ".jpeg"}
-
-    for root, _, files in os.walk(dataset_dir):
-        for filename in files:
-            stem, ext = os.path.splitext(filename)
-            if ext.lower() not in image_extensions:
-                continue
-
-            path = os.path.join(root, filename)
-            image_index[filename] = path
-            image_index[stem] = path
-
-    return image_index
-
-
 def clean_state_dict(state_dict):
     cleaned_state_dict = {}
 
@@ -246,12 +155,13 @@ def load_segmentation_model(device):
 
 
 def main():
-    dataset_dir = download_dataset()
-    metadata_path = find_metadata_csv(dataset_dir)
-    image_index = make_image_index(dataset_dir)
+    if not os.path.exists(INPUT_METADATA_PATH):
+        raise FileNotFoundError(
+            f"Missing prepared PAD-UFES-20 metadata: {INPUT_METADATA_PATH}. "
+            "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` first."
+        )
 
-    df = pd.read_csv(metadata_path)
-
+    df = pd.read_csv(INPUT_METADATA_PATH)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -278,14 +188,12 @@ def main():
     for _, row in df.iterrows():
         img_id = str(row["img_id"])
         img_key = os.path.splitext(img_id)[0]
-        image_path = image_index.get(img_id) or image_index.get(img_key) or image_index.get(img_key + ".png")
+        image_path = row["image_path"]
+        output_path = os.path.join(OUTPUT_DIR, img_key + ".jpg")
 
-        if image_path is None:
+        if not os.path.exists(image_path):
             missing_images += 1
             continue
-
-        output_filename = img_key + ".png"
-        output_path = os.path.join(OUTPUT_DIR, output_filename)
 
         if os.path.exists(output_path):
             skipped_existing += 1
@@ -308,24 +216,25 @@ def main():
 
                 white_background = Image.new("RGB", original_size, (255, 255, 255))
                 extracted_image = Image.composite(image, white_background, mask)
-                extracted_image.save(output_path)
+                extracted_image.save(output_path, quality=95)
 
             created += 1
 
         output_row = row.to_dict()
         output_row["original_image_path"] = image_path
-        output_row["extracted_image_path"] = output_path
+        output_row["lesion_white_image_path"] = output_path
+        output_row["image_path"] = output_path
         rows.append(output_row)
 
     manifest_df = pd.DataFrame(rows)
-    manifest_df.to_csv(MANIFEST_PATH, index=False)
+    manifest_df.to_csv(OUTPUT_METADATA_PATH, index=False)
 
-    print(f"Metadata path: {metadata_path}")
-    print(f"Created extracted lesion images: {created}")
+    print(f"Input metadata: {INPUT_METADATA_PATH}")
+    print(f"Created PAD lesion-white images: {created}")
     print(f"Already existed: {skipped_existing}")
-    print(f"Missing original images: {missing_images}")
+    print(f"Missing prepared PAD images: {missing_images}")
     print(f"Output folder: {OUTPUT_DIR}")
-    print(f"Saved manifest: {MANIFEST_PATH}")
+    print(f"Saved metadata: {OUTPUT_METADATA_PATH}")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=create_ham10000
+#SBATCH --job-name=evaluate_pad_ufes20_lesion_white_images
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
-#SBATCH -p RM-shared
-#SBATCH -N 1
+#SBATCH --partition=GPU-shared
+#SBATCH --gres=gpu:1
+#SBATCH --account=mth250011p
+#SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=1900M
-#SBATCH --account=mth250011p
-#SBATCH --time=00:30:00
+#SBATCH --mem=20G
+#SBATCH --time=01:00:00
 
 set -euo pipefail
 
@@ -39,10 +40,10 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f data.py ]]; then
-    SCRIPT_PATH="data.py"
+if [[ -f evaluate_pad_ufes20_lesion_white_images.py ]]; then
+    SCRIPT_PATH="evaluate_pad_ufes20_lesion_white_images.py"
 else
-    SCRIPT_PATH="src/data.py"
+    SCRIPT_PATH="src/evaluate_pad_ufes20_lesion_white_images.py"
 fi
 
 /jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"
