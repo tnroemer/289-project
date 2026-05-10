@@ -7,7 +7,11 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-from clinical_operating_point import (
+from training.ham10000_training import (
+    COMMON_LABELS,
+    HAM_BINARY_LABELS,
+    MALIGNANT_LABELS,
+    OVERLAP_LABELS,
     apply_temperature,
     binary_metrics_from_scores,
     malignant_scores_from_probs,
@@ -24,9 +28,6 @@ PAD_IMAGE_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
 PAD_IMAGE_METADATA_PATH = os.path.join(PAD_IMAGE_DIR, "metadata.csv")
 PAD_LESION_WHITE_IMAGE_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-lesion-white-images")
 PAD_LESION_WHITE_METADATA_PATH = os.path.join(PAD_LESION_WHITE_IMAGE_DIR, "metadata.csv")
-
-COMMON_LABELS = ["akiec", "bcc", "bkl", "mel", "nv"]
-MALIGNANT_LABELS = {"akiec", "bcc", "mel"}
 
 batch_size = 32
 num_workers = 4
@@ -51,11 +52,12 @@ class PadImagesDataset(Dataset):
 
         return {
             "pixel_values": image,
-            "labels": torch.tensor(self.label_to_id[row["common_label"]], dtype=torch.long),
+            "labels": torch.tensor(self.label_to_id[row["binary_class"]], dtype=torch.long),
             "img_id": row["img_id"],
             "image_path": row["image_path"],
             "diagnostic": row["diagnostic"],
             "common_label": row["common_label"],
+            "binary_class": row["binary_class"],
         }
 
 
@@ -251,12 +253,18 @@ def prepare_pad_df(image_source):
 
     missing_images = df["image_path"].isna().sum()
     df = df.dropna(subset=["image_path", "common_label"]).reset_index(drop=True)
+    df["common_label"] = df["common_label"].astype(str).str.lower()
+    df = df[df["common_label"].isin(OVERLAP_LABELS)].copy().reset_index(drop=True)
+    df["binary_class"] = df["common_label"].map(HAM_BINARY_LABELS)
+    df = df.dropna(subset=["binary_class"]).reset_index(drop=True)
     df = df[df["image_path"].apply(os.path.exists)].reset_index(drop=True)
 
     print(f"Found PAD-UFES-20 {source_name}: {len(df)}")
     print(f"Missing PAD image paths before filtering: {missing_images}")
     print("PAD common-label counts:")
     print(df["common_label"].value_counts().sort_index())
+    print("PAD binary counts:")
+    print(df["binary_class"].value_counts().sort_index())
 
     return df, source_name
 
@@ -268,6 +276,11 @@ def predict_model(model_spec, df, device):
 
     checkpoint = load_checkpoint(model_spec["path"], device)
     labels = checkpoint.get("labels", COMMON_LABELS)
+    if labels != COMMON_LABELS:
+        raise ValueError(
+            f"{model_spec['path']} was trained with labels {labels}. "
+            "Retrain the model with the binary benign/malignant target before evaluation."
+        )
     config = checkpoint.get("config", {})
     image_size = config.get("image_size", 224)
     temperature = checkpoint.get("temperature", config.get("temperature", 1.0))

@@ -9,24 +9,24 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-from clinical_operating_point import (
-    TARGET_SENSITIVITY,
-    apply_temperature,
-    choose_threshold_for_sensitivity,
-    fit_temperature,
-    malignant_scores_from_probs,
-)
 from training.ham10000_training import (
     COMMON_LABELS,
+    HAM_BINARY_LABELS,
     MALIGNANT_CLASS_WEIGHT_MULTIPLIER,
     MALIGNANT_LABELS,
+    OVERLAP_LABELS,
+    TARGET_SENSITIVITY,
     TRAIN_AUGMENTATION_NOTE,
     SkinLesionDataset,
+    apply_temperature,
     batch_size,
+    choose_threshold_for_sensitivity,
     collect_logits,
     compute_class_weights,
     evaluate,
+    fit_temperature,
     load_checkpoint,
+    malignant_scores_from_probs,
     make_transforms,
     num_epochs,
     num_workers,
@@ -62,6 +62,14 @@ def load_pad_split(split_name):
 
     if "dx" not in df.columns:
         df["dx"] = df["common_label"].str.lower()
+
+    df["dx"] = df["dx"].astype(str).str.lower()
+    df = df[df["dx"].isin(OVERLAP_LABELS)].copy().reset_index(drop=True)
+    label_to_id = {label: i for i, label in enumerate(COMMON_LABELS)}
+    df["common_label"] = df["dx"]
+    df["binary_class"] = df["dx"].map(HAM_BINARY_LABELS)
+    df["binary_label"] = df["binary_class"].map(label_to_id)
+    df["label"] = df["binary_label"]
 
     missing_images = (~df["image_path"].apply(os.path.exists)).sum()
     df = df[df["image_path"].apply(os.path.exists)].reset_index(drop=True)
@@ -133,7 +141,8 @@ def train_pad_ufes20_full_image_resnet():
         "model": "SimpleResNet",
         "model_type": "resnet",
         "dataset": "PAD-UFES-20",
-        "target": "multiclass_common_ham_pad_labels",
+        "target": "binary_benign_malignant_overlap_labels",
+        "overlap_labels": OVERLAP_LABELS,
         "labels": COMMON_LABELS,
         "malignant_labels": sorted(MALIGNANT_LABELS),
         "image_source": "full_image",
