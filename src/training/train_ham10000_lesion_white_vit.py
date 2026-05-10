@@ -1,4 +1,4 @@
-from ham10000_training import train_ham10000_model
+from training.ham10000_training import train_ham10000_model
 
 
 if __name__ == "__main__":

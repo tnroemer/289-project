@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-from model_architectures import build_model
+from models.model_architectures import build_model
 
 
 DATA_ROOT = "/ocean/projects/mth250011p/troemer"
@@ -189,25 +189,25 @@ def prepare_pad_df(image_source):
         if not os.path.exists(PAD_IMAGE_METADATA_PATH):
             raise FileNotFoundError(
                 f"Missing prepared PAD-UFES-20 metadata: {PAD_IMAGE_METADATA_PATH}. "
-                "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` first."
+                "Run `sbatch submit/submit_create_data.sh` first."
             )
         df = pd.read_csv(PAD_IMAGE_METADATA_PATH)
-        source_name = "full_images"
+        source_name = "full_image"
     elif image_source == "lesion_white":
         if not os.path.exists(PAD_LESION_WHITE_METADATA_PATH):
             raise FileNotFoundError(
                 f"Missing prepared PAD-UFES-20 lesion-white metadata: {PAD_LESION_WHITE_METADATA_PATH}. "
-                "Run `sbatch submit/submit_create_pad_ufes20_lesion_white_images.sh` first."
+                "Run `sbatch submit/submit_create_lesion_white_data.sh` first."
             )
         df = pd.read_csv(PAD_LESION_WHITE_METADATA_PATH)
-        source_name = "lesion_white_images"
+        source_name = "lesion_white"
     else:
         raise ValueError(f"Unknown image_source: {image_source}")
 
     if "common_label" not in df.columns:
         raise ValueError(
             "Prepared PAD-UFES-20 metadata is missing common_label. "
-            "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` to rebuild it."
+            "Run `sbatch submit/submit_create_data.sh` to rebuild it."
         )
 
     missing_images = df["image_path"].isna().sum()

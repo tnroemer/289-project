@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=evaluate_pad_ufes20_full_images
+#SBATCH --job-name=evaluate_pad_ufes20_full_image_models
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
 #SBATCH --partition=GPU-shared
@@ -33,6 +33,7 @@ conda activate /jet/home/troemer/.conda/envs/stat214
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
 export PYTHONUNBUFFERED=1
+export PYTHONPATH="${REPO_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 THREADS="${SLURM_CPUS_PER_TASK:-4}"
 export OMP_NUM_THREADS="$THREADS"
@@ -40,12 +41,8 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f evaluate_pad_ufes20_full_images.py ]]; then
-    SCRIPT_PATH="evaluate_pad_ufes20_full_images.py"
-else
-    SCRIPT_PATH="src/evaluate_pad_ufes20_full_images.py"
-fi
+PYTHON_MODULE="evaluation.evaluate_pad_ufes20_full_image_models"
 
-/jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"
+/jet/home/troemer/.conda/envs/stat214/bin/python -m "$PYTHON_MODULE"
 
 echo "Job finished on $(date)"

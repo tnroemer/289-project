@@ -1,14 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=create_ham10000_lesion_white_images
+#SBATCH --job-name=create_lesion_white_data
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
-#SBATCH -p RM-shared
+#SBATCH --partition=GPU-shared
+#SBATCH --gres=gpu:1
 #SBATCH --account=mth250011p
-#SBATCH -N 1
+#SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=1900M
-#SBATCH --time=01:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=20G
+#SBATCH --time=02:00:00
 
 set -euo pipefail
 
@@ -32,19 +33,16 @@ conda activate /jet/home/troemer/.conda/envs/stat214
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
 export PYTHONUNBUFFERED=1
+export PYTHONPATH="${REPO_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
-THREADS="${SLURM_CPUS_PER_TASK:-8}"
+THREADS="${SLURM_CPUS_PER_TASK:-4}"
 export OMP_NUM_THREADS="$THREADS"
 export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f create_ham10000_lesion_white_images.py ]]; then
-    SCRIPT_PATH="create_ham10000_lesion_white_images.py"
-else
-    SCRIPT_PATH="src/create_ham10000_lesion_white_images.py"
-fi
+PYTHON_MODULE="data_setup.create_lesion_white_data"
 
-/jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"
+/jet/home/troemer/.conda/envs/stat214/bin/python -m "$PYTHON_MODULE"
 
 echo "Job finished on $(date)"

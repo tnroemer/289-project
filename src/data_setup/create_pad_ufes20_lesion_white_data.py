@@ -158,7 +158,7 @@ def main():
     if not os.path.exists(INPUT_METADATA_PATH):
         raise FileNotFoundError(
             f"Missing prepared PAD-UFES-20 metadata: {INPUT_METADATA_PATH}. "
-            "Run `sbatch submit/submit_prepare_ham10000_and_pad_ufes20_data.sh` first."
+            "Run `sbatch submit/submit_create_data.sh` first."
         )
 
     df = pd.read_csv(INPUT_METADATA_PATH)

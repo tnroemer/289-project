@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=evaluate_pad_ufes20_lesion_white_images
+#SBATCH --job-name=train_pad_ufes20_full_image_resnet
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
 #SBATCH --partition=GPU-shared
@@ -9,7 +9,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=20G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 
 set -euo pipefail
 
@@ -30,9 +30,11 @@ echo "Working directory: $(pwd)"
 module load anaconda3/2024.10-1
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /jet/home/troemer/.conda/envs/stat214
+source /ocean/projects/mth250011p/troemer/.wandb_env
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
 export PYTHONUNBUFFERED=1
+export PYTHONPATH="${REPO_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 THREADS="${SLURM_CPUS_PER_TASK:-4}"
 export OMP_NUM_THREADS="$THREADS"
@@ -40,12 +42,8 @@ export MKL_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="$THREADS"
 export NUMEXPR_NUM_THREADS="$THREADS"
 
-if [[ -f evaluate_pad_ufes20_lesion_white_images.py ]]; then
-    SCRIPT_PATH="evaluate_pad_ufes20_lesion_white_images.py"
-else
-    SCRIPT_PATH="src/evaluate_pad_ufes20_lesion_white_images.py"
-fi
+PYTHON_MODULE="training.train_pad_ufes20_full_image_resnet"
 
-/jet/home/troemer/.conda/envs/stat214/bin/python "$SCRIPT_PATH"
+/jet/home/troemer/.conda/envs/stat214/bin/python -m "$PYTHON_MODULE"
 
 echo "Job finished on $(date)"

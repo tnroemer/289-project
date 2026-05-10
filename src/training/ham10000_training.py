@@ -10,7 +10,7 @@ from torch.optim import AdamW
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-from model_architectures import build_model
+from models.model_architectures import build_model
 
 
 DATA_ROOT = "/ocean/projects/mth250011p/troemer"
@@ -21,6 +21,10 @@ PRED_DIR = os.path.join(RUN_DIR, "preds")
 
 COMMON_LABELS = ["akiec", "bcc", "bkl", "mel", "nv"]
 MALIGNANT_LABELS = {"akiec", "bcc", "mel"}
+TRAIN_AUGMENTATION_NOTE = (
+    "resize, random resized crop, flips, rotation, affine translation/scale/shear, "
+    "mild perspective, color jitter, occasional grayscale, and mild blur"
+)
 
 batch_size = 32
 num_epochs = 60
@@ -91,11 +95,27 @@ def load_checkpoint(path, device):
 
 def make_transforms(image_size):
     train_transform = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
+        transforms.Resize((int(image_size * 1.15), int(image_size * 1.15))),
+        transforms.RandomResizedCrop(
+            image_size,
+            scale=(0.80, 1.0),
+            ratio=(0.90, 1.10),
+        ),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(20),
-        transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10),
+        transforms.RandomRotation(45),
+        transforms.RandomAffine(
+            degrees=0,
+            translate=(0.05, 0.05),
+            scale=(0.90, 1.10),
+            shear=5,
+        ),
+        transforms.RandomPerspective(distortion_scale=0.12, p=0.20),
+        transforms.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.20, hue=0.03),
+        transforms.RandomGrayscale(p=0.05),
+        transforms.RandomApply([
+            transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
+        ], p=0.20),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -120,7 +140,7 @@ def load_split(split_name, image_source):
 
     if not os.path.exists(split_path):
         raise FileNotFoundError(
-            f"Missing split file: {split_path}. Run src/data.py before training."
+            f"Missing split file: {split_path}. Run `sbatch submit/submit_create_data.sh` before training."
         )
 
     df = pd.read_csv(split_path)
@@ -518,6 +538,7 @@ def train_ham10000_model(model_type, image_source):
         "num_workers": num_workers,
         "class_weights": class_weights,
         "class_weight_note": "inverse frequency weights normalized to mean 1",
+        "train_augmentation": TRAIN_AUGMENTATION_NOTE,
         "train_size": len(train_df),
         "val_size": len(val_df),
         "test_size": len(test_df),
