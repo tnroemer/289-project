@@ -1,0 +1,51 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/evaluate_pad_ufes20_lesion_white_models-40732293
+Job started on Mon May 11 00:45:27 EDT 2026
+Running on node: v020.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+Found PAD-UFES-20 lesion_white: 2106
+Missing PAD image paths before filtering: 0
+Missing PAD image files before filtering: 0
+PAD dx counts:
+dx
+akiec    730
+bcc      845
+bkl      235
+mel       52
+nv       244
+Name: count, dtype: int64
+PAD binary counts:
+binary_class
+benign        479
+malignant    1627
+Name: count, dtype: int64
+CUDA available: True
+GPU: Tesla V100-SXM2-32GB
+Evaluating basic_cnn_lesion_white
+basic_cnn_lesion_white sensitivity: 0.5648 | specificity: 0.6514 | threshold: 0.3998
+WARNING: basic_cnn_lesion_white sensitivity is below target 0.90 on PAD-UFES-20 lesion_white.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_lesion_white_basic_cnn_lesion_white_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_lesion_white_basic_cnn_lesion_white_metrics.csv
+Evaluating vit_lesion_white
+vit_lesion_white sensitivity: 0.6835 | specificity: 0.3591 | threshold: 0.4535
+WARNING: vit_lesion_white sensitivity is below target 0.90 on PAD-UFES-20 lesion_white.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_lesion_white_vit_lesion_white_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_lesion_white_vit_lesion_white_metrics.csv
+Evaluating resnet_lesion_white
+resnet_lesion_white sensitivity: 0.4548 | specificity: 0.6889 | threshold: 0.3948
+WARNING: resnet_lesion_white sensitivity is below target 0.90 on PAD-UFES-20 lesion_white.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_lesion_white_resnet_lesion_white_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_lesion_white_resnet_lesion_white_metrics.csv
+Evaluating pretrained_resnet50_lesion_white
+pretrained_resnet50_lesion_white sensitivity: 0.5845 | specificity: 0.5804 | threshold: 0.3490
+WARNING: pretrained_resnet50_lesion_white sensitivity is below target 0.90 on PAD-UFES-20 lesion_white.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_lesion_white_pretrained_resnet50_lesion_white_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_lesion_white_pretrained_resnet50_lesion_white_metrics.csv
+Evaluating lesion_white ensemble
+Ensemble HAM validation sensitivity: 0.9010 | specificity: 0.7182 | threshold: 0.4202
+ensemble sensitivity: 0.5390 | specificity: 0.6660 | threshold: 0.4202
+WARNING: ensemble sensitivity is below target 0.90 on PAD-UFES-20 lesion_white.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_lesion_white_ensemble_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_lesion_white_ensemble_metrics.csv
+Job finished on Mon May 11 00:48:08 EDT 2026

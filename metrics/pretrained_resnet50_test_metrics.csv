@@ -1,0 +1,17 @@
+metric,value
+loss,0.5823409306547029
+threshold,0.5008561015129089
+target_sensitivity,0.9
+accuracy,0.8224043715846995
+precision,0.5359477124183006
+sensitivity,0.8395904436860068
+specificity,0.8181041844577285
+f1,0.6542553191489362
+balanced_accuracy,0.8288473140718676
+true_positive,246.0
+false_positive,213.0
+false_negative,47.0
+true_negative,958.0
+malignant_support,293.0
+benign_support,1171.0
+num_examples,1464.0

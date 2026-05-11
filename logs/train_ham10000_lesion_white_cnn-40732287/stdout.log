@@ -1,0 +1,117 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/train_ham10000_lesion_white_cnn-40732287
+Job started on Sun May 10 23:22:33 EDT 2026
+Running on node: v020.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+train examples found: 6830
+train missing images: 0
+val examples found: 1464
+val missing images: 0
+test examples found: 1464
+test missing images: 0
+Train counts:
+dx
+akiec     229
+bcc       360
+bkl       769
+mel       779
+nv       4693
+Name: count, dtype: int64
+Binary train counts:
+binary_class
+benign       5462
+malignant    1368
+Name: count, dtype: int64
+BCE pos_weight (negatives / positives): 3.9927
+CUDA available: True
+GPU: Tesla V100-SXM2-32GB
+Trainable parameters: 1239777
+Epoch 1/60 | Train Loss: 1.0209 | Val Loss: 0.9148 | Val Threshold: 0.3200 | Val Sens: 0.9010 | Val Spec: 0.5269
+Saved new best model: val_specificity=0.5269
+Epoch 2/60 | Train Loss: 0.9543 | Val Loss: 0.8530 | Val Threshold: 0.3402 | Val Sens: 0.9010 | Val Spec: 0.5670
+Saved new best model: val_specificity=0.5670
+Epoch 3/60 | Train Loss: 0.9340 | Val Loss: 0.8000 | Val Threshold: 0.4455 | Val Sens: 0.9010 | Val Spec: 0.5798
+Saved new best model: val_specificity=0.5798
+Epoch 4/60 | Train Loss: 0.9351 | Val Loss: 0.8211 | Val Threshold: 0.4114 | Val Sens: 0.9010 | Val Spec: 0.5448
+Epoch 5/60 | Train Loss: 0.9382 | Val Loss: 0.8644 | Val Threshold: 0.2811 | Val Sens: 0.9010 | Val Spec: 0.5628
+Epoch 6/60 | Train Loss: 0.9192 | Val Loss: 0.8311 | Val Threshold: 0.4248 | Val Sens: 0.9010 | Val Spec: 0.5517
+Epoch 7/60 | Train Loss: 0.9303 | Val Loss: 0.8352 | Val Threshold: 0.4575 | Val Sens: 0.9010 | Val Spec: 0.5611
+Epoch 8/60 | Train Loss: 0.9210 | Val Loss: 0.7964 | Val Threshold: 0.3660 | Val Sens: 0.9010 | Val Spec: 0.5739
+Epoch 9/60 | Train Loss: 0.9117 | Val Loss: 0.8201 | Val Threshold: 0.4932 | Val Sens: 0.9010 | Val Spec: 0.6003
+Saved new best model: val_specificity=0.6003
+Epoch 10/60 | Train Loss: 0.9097 | Val Loss: 0.8117 | Val Threshold: 0.4390 | Val Sens: 0.9010 | Val Spec: 0.5406
+Epoch 11/60 | Train Loss: 0.9027 | Val Loss: 0.8128 | Val Threshold: 0.4237 | Val Sens: 0.9010 | Val Spec: 0.5278
+Epoch 12/60 | Train Loss: 0.8931 | Val Loss: 0.7934 | Val Threshold: 0.4970 | Val Sens: 0.9010 | Val Spec: 0.6046
+Saved new best model: val_specificity=0.6046
+Epoch 13/60 | Train Loss: 0.9038 | Val Loss: 0.8227 | Val Threshold: 0.4959 | Val Sens: 0.9010 | Val Spec: 0.5875
+Epoch 14/60 | Train Loss: 0.8800 | Val Loss: 0.7868 | Val Threshold: 0.4401 | Val Sens: 0.9010 | Val Spec: 0.5969
+Epoch 15/60 | Train Loss: 0.8828 | Val Loss: 0.8033 | Val Threshold: 0.5070 | Val Sens: 0.9010 | Val Spec: 0.5961
+Epoch 16/60 | Train Loss: 0.8759 | Val Loss: 0.7809 | Val Threshold: 0.4902 | Val Sens: 0.9010 | Val Spec: 0.5986
+Epoch 17/60 | Train Loss: 0.8493 | Val Loss: 0.7776 | Val Threshold: 0.4367 | Val Sens: 0.9010 | Val Spec: 0.5952
+Epoch 18/60 | Train Loss: 0.8709 | Val Loss: 0.7865 | Val Threshold: 0.3564 | Val Sens: 0.9010 | Val Spec: 0.5576
+Epoch 19/60 | Train Loss: 0.8534 | Val Loss: 0.7832 | Val Threshold: 0.4465 | Val Sens: 0.9010 | Val Spec: 0.5850
+Epoch 20/60 | Train Loss: 0.8469 | Val Loss: 0.7872 | Val Threshold: 0.4348 | Val Sens: 0.9010 | Val Spec: 0.5935
+Epoch 21/60 | Train Loss: 0.8496 | Val Loss: 0.7823 | Val Threshold: 0.4464 | Val Sens: 0.9010 | Val Spec: 0.6012
+Epoch 22/60 | Train Loss: 0.8431 | Val Loss: 0.7995 | Val Threshold: 0.4886 | Val Sens: 0.9010 | Val Spec: 0.5884
+Epoch 23/60 | Train Loss: 0.8303 | Val Loss: 0.7756 | Val Threshold: 0.4822 | Val Sens: 0.9010 | Val Spec: 0.6080
+Saved new best model: val_specificity=0.6080
+Epoch 24/60 | Train Loss: 0.8498 | Val Loss: 0.7765 | Val Threshold: 0.4462 | Val Sens: 0.9010 | Val Spec: 0.5790
+Epoch 25/60 | Train Loss: 0.8332 | Val Loss: 0.7624 | Val Threshold: 0.4484 | Val Sens: 0.9010 | Val Spec: 0.5986
+Epoch 26/60 | Train Loss: 0.8408 | Val Loss: 0.7758 | Val Threshold: 0.4927 | Val Sens: 0.9010 | Val Spec: 0.6106
+Saved new best model: val_specificity=0.6106
+Epoch 27/60 | Train Loss: 0.8215 | Val Loss: 0.7665 | Val Threshold: 0.4311 | Val Sens: 0.9010 | Val Spec: 0.5747
+Epoch 28/60 | Train Loss: 0.8247 | Val Loss: 0.7941 | Val Threshold: 0.4959 | Val Sens: 0.9010 | Val Spec: 0.5986
+Epoch 29/60 | Train Loss: 0.8279 | Val Loss: 0.7625 | Val Threshold: 0.4971 | Val Sens: 0.9010 | Val Spec: 0.5730
+Epoch 30/60 | Train Loss: 0.8140 | Val Loss: 0.7670 | Val Threshold: 0.4311 | Val Sens: 0.9010 | Val Spec: 0.6097
+Epoch 31/60 | Train Loss: 0.8070 | Val Loss: 0.7401 | Val Threshold: 0.4200 | Val Sens: 0.9010 | Val Spec: 0.6038
+Epoch 32/60 | Train Loss: 0.8004 | Val Loss: 0.7617 | Val Threshold: 0.4806 | Val Sens: 0.9010 | Val Spec: 0.6208
+Saved new best model: val_specificity=0.6208
+Epoch 33/60 | Train Loss: 0.8079 | Val Loss: 0.7719 | Val Threshold: 0.4885 | Val Sens: 0.9010 | Val Spec: 0.5952
+Epoch 34/60 | Train Loss: 0.7986 | Val Loss: 0.7561 | Val Threshold: 0.4434 | Val Sens: 0.9010 | Val Spec: 0.6149
+Epoch 35/60 | Train Loss: 0.8149 | Val Loss: 0.7551 | Val Threshold: 0.4052 | Val Sens: 0.9010 | Val Spec: 0.6174
+Epoch 36/60 | Train Loss: 0.7969 | Val Loss: 0.7425 | Val Threshold: 0.4194 | Val Sens: 0.9010 | Val Spec: 0.6260
+Saved new best model: val_specificity=0.6260
+Epoch 37/60 | Train Loss: 0.8000 | Val Loss: 0.7390 | Val Threshold: 0.3953 | Val Sens: 0.9010 | Val Spec: 0.6388
+Saved new best model: val_specificity=0.6388
+Epoch 38/60 | Train Loss: 0.8026 | Val Loss: 0.7347 | Val Threshold: 0.4522 | Val Sens: 0.9010 | Val Spec: 0.6089
+Epoch 39/60 | Train Loss: 0.7990 | Val Loss: 0.7340 | Val Threshold: 0.4267 | Val Sens: 0.9010 | Val Spec: 0.6243
+Epoch 40/60 | Train Loss: 0.7915 | Val Loss: 0.7394 | Val Threshold: 0.4423 | Val Sens: 0.9010 | Val Spec: 0.6311
+Epoch 41/60 | Train Loss: 0.7821 | Val Loss: 0.7328 | Val Threshold: 0.4019 | Val Sens: 0.9010 | Val Spec: 0.6268
+Epoch 42/60 | Train Loss: 0.7774 | Val Loss: 0.7503 | Val Threshold: 0.4078 | Val Sens: 0.9010 | Val Spec: 0.6208
+Epoch 43/60 | Train Loss: 0.7798 | Val Loss: 0.7331 | Val Threshold: 0.4374 | Val Sens: 0.9010 | Val Spec: 0.6311
+Epoch 44/60 | Train Loss: 0.7772 | Val Loss: 0.7332 | Val Threshold: 0.3978 | Val Sens: 0.9010 | Val Spec: 0.6447
+Saved new best model: val_specificity=0.6447
+Epoch 45/60 | Train Loss: 0.7659 | Val Loss: 0.7263 | Val Threshold: 0.4005 | Val Sens: 0.9010 | Val Spec: 0.6388
+Epoch 46/60 | Train Loss: 0.7740 | Val Loss: 0.7523 | Val Threshold: 0.3729 | Val Sens: 0.9010 | Val Spec: 0.6354
+Epoch 47/60 | Train Loss: 0.7610 | Val Loss: 0.7349 | Val Threshold: 0.3833 | Val Sens: 0.9010 | Val Spec: 0.6260
+Epoch 48/60 | Train Loss: 0.7748 | Val Loss: 0.7255 | Val Threshold: 0.4274 | Val Sens: 0.9010 | Val Spec: 0.6465
+Saved new best model: val_specificity=0.6465
+Epoch 49/60 | Train Loss: 0.7562 | Val Loss: 0.7255 | Val Threshold: 0.4053 | Val Sens: 0.9010 | Val Spec: 0.6371
+Epoch 50/60 | Train Loss: 0.7680 | Val Loss: 0.7286 | Val Threshold: 0.4057 | Val Sens: 0.9010 | Val Spec: 0.6499
+Saved new best model: val_specificity=0.6499
+Epoch 51/60 | Train Loss: 0.7702 | Val Loss: 0.7263 | Val Threshold: 0.3998 | Val Sens: 0.9010 | Val Spec: 0.6576
+Saved new best model: val_specificity=0.6576
+Epoch 52/60 | Train Loss: 0.7560 | Val Loss: 0.7280 | Val Threshold: 0.3794 | Val Sens: 0.9010 | Val Spec: 0.6576
+Epoch 53/60 | Train Loss: 0.7638 | Val Loss: 0.7258 | Val Threshold: 0.3924 | Val Sens: 0.9010 | Val Spec: 0.6558
+Epoch 54/60 | Train Loss: 0.7550 | Val Loss: 0.7266 | Val Threshold: 0.3932 | Val Sens: 0.9010 | Val Spec: 0.6482
+Epoch 55/60 | Train Loss: 0.7770 | Val Loss: 0.7204 | Val Threshold: 0.4005 | Val Sens: 0.9010 | Val Spec: 0.6405
+Epoch 56/60 | Train Loss: 0.7601 | Val Loss: 0.7210 | Val Threshold: 0.4043 | Val Sens: 0.9010 | Val Spec: 0.6379
+Epoch 57/60 | Train Loss: 0.7542 | Val Loss: 0.7233 | Val Threshold: 0.3997 | Val Sens: 0.9010 | Val Spec: 0.6490
+Epoch 58/60 | Train Loss: 0.7622 | Val Loss: 0.7301 | Val Threshold: 0.3830 | Val Sens: 0.9010 | Val Spec: 0.6482
+Epoch 59/60 | Train Loss: 0.7666 | Val Loss: 0.7236 | Val Threshold: 0.4075 | Val Sens: 0.9010 | Val Spec: 0.6439
+Epoch 60/60 | Train Loss: 0.7580 | Val Loss: 0.7211 | Val Threshold: 0.4144 | Val Sens: 0.9010 | Val Spec: 0.6473
+Validation threshold: 0.3998
+Validation sensitivity: 0.9010
+Validation specificity: 0.6576
+Test Loss: 0.6980
+Test Accuracy: 0.7172
+Test Precision: 0.4079
+Test Sensitivity: 0.9147
+Test Specificity: 0.6678
+Test F1: 0.5642
+Test Balanced Acc: 0.7912
+Threshold: 0.3998
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/basic_cnn_lesion_white_test_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/basic_cnn_lesion_white_test_metrics.csv
+Job finished on Mon May 11 00:28:01 EDT 2026
