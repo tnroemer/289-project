@@ -28,7 +28,10 @@ echo "Working directory: $(pwd)"
 data_job=$(sbatch --parsable submit/submit_create_data.sh)
 echo "submit_create_data: $data_job"
 
-lesion_white_job=$(sbatch --parsable --dependency=afterok:${data_job} submit/submit_create_lesion_white_data.sh)
-echo "submit_create_lesion_white_data after $data_job: $lesion_white_job"
+segmentation_job=$(sbatch --parsable --dependency=afterok:${data_job} submit/submit_train_ham10000_segmentation_model.sh)
+echo "submit_train_ham10000_segmentation_model after $data_job: $segmentation_job"
+
+lesion_white_job=$(sbatch --parsable --dependency=afterok:${segmentation_job} submit/submit_create_lesion_white_data.sh)
+echo "submit_create_lesion_white_data after $segmentation_job: $lesion_white_job"
 
 echo "All data creation jobs submitted on $(date)."

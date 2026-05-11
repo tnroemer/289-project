@@ -5,8 +5,9 @@ import pandas as pd
 import torch
 
 from PIL import Image
-from torch import nn
 from torchvision import transforms
+
+from models.model_architectures import UNet, build_segmentation_model
 
 
 DATA_ROOT = "/ocean/projects/mth250011p/troemer"
@@ -14,68 +15,13 @@ RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 
 INPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
 INPUT_METADATA_PATH = os.path.join(INPUT_DIR, "metadata.csv")
-MODEL_PATH = os.path.join(RUN_DIR, "models", "segmentation_unet_v2.pth")
+MODEL_PATH = os.path.join(RUN_DIR, "models", "segmentation_deeplabv3_resnet50.pth")
+LEGACY_MODEL_PATH = os.path.join(RUN_DIR, "models", "segmentation_unet_v2.pth")
 OUTPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-lesion-white-images")
 OUTPUT_METADATA_PATH = os.path.join(OUTPUT_DIR, "metadata.csv")
 
 segmentation_image_size = 256
 mask_threshold = 0.5
-
-
-class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1, base_channels=32):
-        super().__init__()
-
-        self.down1 = ConvBlock(in_channels, base_channels)
-        self.down2 = ConvBlock(base_channels, base_channels * 2)
-        self.down3 = ConvBlock(base_channels * 2, base_channels * 4)
-        self.bottleneck = ConvBlock(base_channels * 4, base_channels * 8)
-
-        self.pool = nn.MaxPool2d(2)
-        self.up3 = nn.ConvTranspose2d(base_channels * 8, base_channels * 4, kernel_size=2, stride=2)
-        self.conv3 = ConvBlock(base_channels * 8, base_channels * 4)
-        self.up2 = nn.ConvTranspose2d(base_channels * 4, base_channels * 2, kernel_size=2, stride=2)
-        self.conv2 = ConvBlock(base_channels * 4, base_channels * 2)
-        self.up1 = nn.ConvTranspose2d(base_channels * 2, base_channels, kernel_size=2, stride=2)
-        self.conv1 = ConvBlock(base_channels * 2, base_channels)
-        self.out = nn.Conv2d(base_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        down1 = self.down1(x)
-        down2 = self.down2(self.pool(down1))
-        down3 = self.down3(self.pool(down2))
-        bottleneck = self.bottleneck(self.pool(down3))
-
-        x = self.up3(bottleneck)
-        x = torch.cat((x, down3), dim=1)
-        x = self.conv3(x)
-
-        x = self.up2(x)
-        x = torch.cat((x, down2), dim=1)
-        x = self.conv2(x)
-
-        x = self.up1(x)
-        x = torch.cat((x, down1), dim=1)
-        x = self.conv1(x)
-
-        return self.out(x)
 
 
 def clean_state_dict(state_dict):
@@ -98,8 +44,15 @@ def load_checkpoint(path, device):
         return torch.load(path, map_location=device)
 
 
+def segmentation_logits(output):
+    if isinstance(output, dict):
+        return output["out"]
+    return output
+
+
 def load_segmentation_model(device):
-    checkpoint = load_checkpoint(MODEL_PATH, device)
+    checkpoint_path = MODEL_PATH if os.path.exists(MODEL_PATH) else LEGACY_MODEL_PATH
+    checkpoint = load_checkpoint(checkpoint_path, device)
 
     if isinstance(checkpoint, dict):
         if "model_state_dict" in checkpoint:
@@ -118,6 +71,14 @@ def load_segmentation_model(device):
     state_dict = clean_state_dict(state_dict)
 
     config = checkpoint.get("config", {}) if isinstance(checkpoint, dict) else {}
+    if config.get("model") == "DeepLabV3ResNet50":
+        config = {**config, "use_pretrained_backbone": False}
+        model = build_segmentation_model(config).to(device)
+        model.load_state_dict(state_dict, strict=True)
+        model.eval()
+        print(f"Loaded segmentation model: {checkpoint_path}")
+        return model, config
+
     base_channels_to_try = []
 
     if "base_channels" in config:
@@ -136,13 +97,13 @@ def load_segmentation_model(device):
             model.load_state_dict(state_dict, strict=True)
             model.eval()
             print(f"Loaded segmentation model with base_channels={base_channels}")
-            return model
+            return model, {**config, "image_size": segmentation_image_size}
         except RuntimeError as error:
             last_error = error
 
     raise RuntimeError(
-        "Could not load segmentation_unet_v2.pth into the U-Net architecture in this script. "
-        "The checkpoint may have been trained with different layer names or widths."
+        f"Could not load segmentation checkpoint: {checkpoint_path}. "
+        "The checkpoint may have been trained with a different architecture."
     ) from last_error
 
 
@@ -161,10 +122,11 @@ def main():
     if torch.cuda.is_available():
         print("GPU:", torch.cuda.get_device_name(0))
 
-    model = load_segmentation_model(device)
+    model, model_config = load_segmentation_model(device)
+    model_image_size = int(model_config.get("image_size", segmentation_image_size))
 
     segment_transform = transforms.Compose([
-        transforms.Resize((segmentation_image_size, segmentation_image_size)),
+        transforms.Resize((model_image_size, model_image_size)),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -197,9 +159,7 @@ def main():
                 tensor = segment_transform(image).unsqueeze(0).to(device)
 
                 with torch.no_grad():
-                    logits = model(tensor)
-                    if isinstance(logits, (tuple, list)):
-                        logits = logits[0]
+                    logits = segmentation_logits(model(tensor))
                     probs = torch.sigmoid(logits)
 
                 mask_array = (probs.squeeze().cpu().numpy() > mask_threshold).astype(np.uint8) * 255

@@ -215,6 +215,62 @@ class SimpleResNet(nn.Module):
         return x
 
 
+class UNetConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class UNet(nn.Module):
+    def __init__(self, in_channels=3, out_channels=1, base_channels=32):
+        super().__init__()
+
+        self.down1 = UNetConvBlock(in_channels, base_channels)
+        self.down2 = UNetConvBlock(base_channels, base_channels * 2)
+        self.down3 = UNetConvBlock(base_channels * 2, base_channels * 4)
+        self.bottleneck = UNetConvBlock(base_channels * 4, base_channels * 8)
+
+        self.pool = nn.MaxPool2d(2)
+        self.up3 = nn.ConvTranspose2d(base_channels * 8, base_channels * 4, kernel_size=2, stride=2)
+        self.conv3 = UNetConvBlock(base_channels * 8, base_channels * 4)
+        self.up2 = nn.ConvTranspose2d(base_channels * 4, base_channels * 2, kernel_size=2, stride=2)
+        self.conv2 = UNetConvBlock(base_channels * 4, base_channels * 2)
+        self.up1 = nn.ConvTranspose2d(base_channels * 2, base_channels, kernel_size=2, stride=2)
+        self.conv1 = UNetConvBlock(base_channels * 2, base_channels)
+        self.out = nn.Conv2d(base_channels, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        down1 = self.down1(x)
+        down2 = self.down2(self.pool(down1))
+        down3 = self.down3(self.pool(down2))
+        bottleneck = self.bottleneck(self.pool(down3))
+
+        x = self.up3(bottleneck)
+        x = torch.cat((x, down3), dim=1)
+        x = self.conv3(x)
+
+        x = self.up2(x)
+        x = torch.cat((x, down2), dim=1)
+        x = self.conv2(x)
+
+        x = self.up1(x)
+        x = torch.cat((x, down1), dim=1)
+        x = self.conv1(x)
+
+        return self.out(x)
+
+
 def build_pretrained_resnet50(num_classes, use_pretrained=True):
     try:
         if hasattr(models, "ResNet50_Weights"):
@@ -242,6 +298,64 @@ def build_pretrained_resnet50(num_classes, use_pretrained=True):
     model.freeze_backbone = True
 
     return model
+
+
+def build_deeplabv3_resnet50(out_channels=1, use_pretrained=True, aux_loss=True):
+    try:
+        if hasattr(models.segmentation, "DeepLabV3_ResNet50_Weights"):
+            weights = models.segmentation.DeepLabV3_ResNet50_Weights.DEFAULT if use_pretrained else None
+            model = models.segmentation.deeplabv3_resnet50(
+                weights=weights,
+                weights_backbone=None,
+                aux_loss=aux_loss,
+            )
+        else:
+            model = models.segmentation.deeplabv3_resnet50(pretrained=use_pretrained, aux_loss=aux_loss)
+    except Exception as error:
+        if use_pretrained:
+            raise RuntimeError(
+                "Could not load pretrained DeepLabV3-ResNet50 weights. "
+                "Make sure the weights are available on the compute server before training."
+            ) from error
+
+        try:
+            model = models.segmentation.deeplabv3_resnet50(
+                weights=None,
+                weights_backbone=None,
+                aux_loss=aux_loss,
+            )
+        except TypeError:
+            model = models.segmentation.deeplabv3_resnet50(pretrained=False, aux_loss=aux_loss)
+
+    classifier_in_channels = model.classifier[-1].in_channels
+    model.classifier[-1] = nn.Conv2d(classifier_in_channels, out_channels, kernel_size=1)
+
+    if model.aux_classifier is not None:
+        aux_in_channels = model.aux_classifier[-1].in_channels
+        model.aux_classifier[-1] = nn.Conv2d(aux_in_channels, out_channels, kernel_size=1)
+
+    return model
+
+
+def build_segmentation_model(config=None):
+    config = config or {}
+    model_name = config.get("model", "DeepLabV3ResNet50")
+
+    if model_name == "DeepLabV3ResNet50":
+        return build_deeplabv3_resnet50(
+            out_channels=config.get("out_channels", 1),
+            use_pretrained=config.get("use_pretrained_backbone", False),
+            aux_loss=config.get("aux_loss", True),
+        )
+
+    if model_name == "UNet":
+        return UNet(
+            in_channels=config.get("in_channels", 3),
+            out_channels=config.get("out_channels", 1),
+            base_channels=config.get("base_channels", 32),
+        )
+
+    raise ValueError(f"Unknown segmentation model: {model_name}")
 
 
 def build_model(model_type, num_classes, config=None):

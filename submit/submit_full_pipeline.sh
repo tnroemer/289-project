@@ -35,8 +35,11 @@ echo "Submitting full skin-lesion pipeline from $REPO_DIR"
 data_job=$(submit_job submit/submit_create_data.sh)
 echo "create_data: $data_job"
 
-lesion_white_job=$(submit_job --dependency=afterok:${data_job} submit/submit_create_lesion_white_data.sh)
-echo "create_lesion_white_data after $data_job: $lesion_white_job"
+segmentation_job=$(submit_job --dependency=afterok:${data_job} submit/submit_train_ham10000_segmentation_model.sh)
+echo "train_ham10000_segmentation_model after $data_job: $segmentation_job"
+
+lesion_white_job=$(submit_job --dependency=afterok:${segmentation_job} submit/submit_create_lesion_white_data.sh)
+echo "create_lesion_white_data after $segmentation_job: $lesion_white_job"
 
 train_jobs=()
 for train_script in \
@@ -68,5 +71,5 @@ lesion_eval_job=$(submit_job \
 echo "evaluate_pad_ufes20_lesion_white_models after all training jobs: $lesion_eval_job"
 
 echo "Pipeline submitted."
-echo "Slurm dependencies enforce: create data -> create lesion-white data -> train models -> evaluate PAD-UFES-20."
+echo "Slurm dependencies enforce: create data -> train segmentation -> create lesion-white data -> train classifiers -> evaluate PAD-UFES-20."
 echo "Pipeline submitter finished on $(date)"
