@@ -70,6 +70,12 @@ lesion_eval_job=$(submit_job \
     submit/submit_evaluate_pad_ufes20_lesion_white_models.sh)
 echo "evaluate_pad_ufes20_lesion_white_models after all training jobs: $lesion_eval_job"
 
+eval_dependency="${full_eval_job}:${lesion_eval_job}"
+bootstrap_job=$(submit_job \
+    --dependency=afterok:${eval_dependency} \
+    submit/submit_bootstrap.sh)
+echo "bootstrap after all evaluation jobs: $bootstrap_job"
+
 echo "Pipeline submitted."
-echo "Slurm dependencies enforce: create data -> train segmentation -> create lesion-white data -> train classifiers -> evaluate PAD-UFES-20."
+echo "Slurm dependencies enforce: create data -> train segmentation -> create lesion-white data -> train classifiers -> evaluate PAD-UFES-20 -> bootstrap metrics."
 echo "Pipeline submitter finished on $(date)"

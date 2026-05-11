@@ -30,9 +30,15 @@ eval_scripts=(
     "submit/submit_evaluate_pad_ufes20_lesion_white_models.sh"
 )
 
+eval_jobs=()
 for eval_script in "${eval_scripts[@]}"; do
     eval_job=$(sbatch --parsable "$eval_script")
+    eval_jobs+=("$eval_job")
     echo "$(basename "$eval_script" .sh): $eval_job"
 done
+
+eval_dependency=$(IFS=:; echo "${eval_jobs[*]}")
+bootstrap_job=$(sbatch --parsable --dependency=afterok:${eval_dependency} submit/submit_bootstrap.sh)
+echo "submit_bootstrap after all evaluation jobs: $bootstrap_job"
 
 echo "All evaluation jobs submitted on $(date)."
