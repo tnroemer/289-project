@@ -1,0 +1,51 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/train_ham10000_segmentation_model-40738556
+Job started on Mon May 11 01:18:19 EDT 2026
+Running on node: w005.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+train segmentation examples: 6830
+val segmentation examples: 1464
+test segmentation examples: 1464
+CUDA available: True
+GPU: NVIDIA H100 80GB HBM3
+Downloading: "https://download.pytorch.org/models/deeplabv3_resnet50_coco-cd0a2569.pth" to /jet/home/troemer/.cache/torch/hub/checkpoints/deeplabv3_resnet50_coco-cd0a2569.pth
+Epoch 1/40 | Train Loss: 0.5793 | Train Dice: 0.8449 | Val Loss: 0.2664 | Val Dice: 0.8736 | Val IoU: 0.8098
+Saved new best segmentation model: val_dice=0.8736
+Epoch 2/40 | Train Loss: 0.3819 | Train Dice: 0.8683 | Val Loss: 0.2255 | Val Dice: 0.8843 | Val IoU: 0.8239
+Saved new best segmentation model: val_dice=0.8843
+Epoch 3/40 | Train Loss: 0.3514 | Train Dice: 0.8753 | Val Loss: 0.2380 | Val Dice: 0.8784 | Val IoU: 0.8153
+Epoch 4/40 | Train Loss: 0.3380 | Train Dice: 0.8781 | Val Loss: 0.2109 | Val Dice: 0.8928 | Val IoU: 0.8355
+Saved new best segmentation model: val_dice=0.8928
+Epoch 5/40 | Train Loss: 0.3313 | Train Dice: 0.8800 | Val Loss: 0.2081 | Val Dice: 0.8906 | Val IoU: 0.8328
+Epoch 6/40 | Train Loss: 0.3282 | Train Dice: 0.8807 | Val Loss: 0.2181 | Val Dice: 0.8886 | Val IoU: 0.8297
+Epoch 7/40 | Train Loss: 0.3244 | Train Dice: 0.8824 | Val Loss: 0.2065 | Val Dice: 0.8903 | Val IoU: 0.8338
+Epoch 8/40 | Train Loss: 0.3188 | Train Dice: 0.8836 | Val Loss: 0.1938 | Val Dice: 0.8969 | Val IoU: 0.8437
+Saved new best segmentation model: val_dice=0.8969
+Epoch 9/40 | Train Loss: 0.3179 | Train Dice: 0.8839 | Val Loss: 0.2118 | Val Dice: 0.8873 | Val IoU: 0.8282
+Epoch 10/40 | Train Loss: 0.3091 | Train Dice: 0.8875 | Val Loss: 0.2080 | Val Dice: 0.8878 | Val IoU: 0.8291
+Epoch 11/40 | Train Loss: 0.3062 | Train Dice: 0.8878 | Val Loss: 0.1974 | Val Dice: 0.8941 | Val IoU: 0.8388
+Epoch 12/40 | Train Loss: 0.3044 | Train Dice: 0.8885 | Val Loss: 0.2024 | Val Dice: 0.8922 | Val IoU: 0.8355
+Epoch 13/40 | Train Loss: 0.2987 | Train Dice: 0.8900 | Val Loss: 0.2100 | Val Dice: 0.8879 | Val IoU: 0.8300
+Epoch 14/40 | Train Loss: 0.2981 | Train Dice: 0.8910 | Val Loss: 0.1891 | Val Dice: 0.8996 | Val IoU: 0.8448
+Saved new best segmentation model: val_dice=0.8996
+Epoch 15/40 | Train Loss: 0.2937 | Train Dice: 0.8923 | Val Loss: 0.1990 | Val Dice: 0.8944 | Val IoU: 0.8392
+Epoch 16/40 | Train Loss: 0.2891 | Train Dice: 0.8934 | Val Loss: 0.1895 | Val Dice: 0.8955 | Val IoU: 0.8412
+Epoch 17/40 | Train Loss: 0.2868 | Train Dice: 0.8947 | Val Loss: 0.2101 | Val Dice: 0.8836 | Val IoU: 0.8255
+Epoch 18/40 | Train Loss: 0.2840 | Train Dice: 0.8950 | Val Loss: 0.1961 | Val Dice: 0.8930 | Val IoU: 0.8370
+Epoch 19/40 | Train Loss: 0.2785 | Train Dice: 0.8979 | Val Loss: 0.1877 | Val Dice: 0.8976 | Val IoU: 0.8439
+Epoch 20/40 | Train Loss: 0.2755 | Train Dice: 0.8997 | Val Loss: 0.1984 | Val Dice: 0.8891 | Val IoU: 0.8346
+Epoch 21/40 | Train Loss: 0.2727 | Train Dice: 0.9002 | Val Loss: 0.1956 | Val Dice: 0.8923 | Val IoU: 0.8372
+Epoch 22/40 | Train Loss: 0.2676 | Train Dice: 0.9036 | Val Loss: 0.1907 | Val Dice: 0.8967 | Val IoU: 0.8430
+Epoch 23/40 | Train Loss: 0.2659 | Train Dice: 0.9030 | Val Loss: 0.1945 | Val Dice: 0.8951 | Val IoU: 0.8405
+Epoch 24/40 | Train Loss: 0.2634 | Train Dice: 0.9035 | Val Loss: 0.1883 | Val Dice: 0.8965 | Val IoU: 0.8433
+Early stopping triggered after 24 epochs.
+Best validation dice: 0.8996
+Test Dice: 0.9088
+Test IoU: 0.8566
+Saved segmentation model: /ocean/projects/mth250011p/troemer/skin-lesions/models/segmentation_deeplabv3_resnet50.pth
+Saved segmentation metrics: /ocean/projects/mth250011p/troemer/skin-lesions/metrics/segmentation_deeplabv3_resnet50_metrics.csv
+Saved HAM predicted masks: 9758
+Missing HAM images while saving masks: 0
+Mask folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/predicted-masks
+Job finished on Mon May 11 01:45:31 EDT 2026

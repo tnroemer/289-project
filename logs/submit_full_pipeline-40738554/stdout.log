@@ -1,0 +1,22 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/submit_full_pipeline-40738554
+Pipeline submitter started on Mon May 11 01:15:43 EDT 2026
+Running on node: r240.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Submitting full skin-lesion pipeline from /ocean/projects/mth250011p/troemer/skin-lesions
+create_data: 40738555
+train_ham10000_segmentation_model after 40738555: 40738556
+create_lesion_white_data after 40738556: 40738557
+submit_train_ham10000_full_image_cnn after 40738557: 40738558
+submit_train_ham10000_full_image_vit after 40738557: 40738559
+submit_train_ham10000_full_image_resnet after 40738557: 40738560
+submit_train_ham10000_full_image_pretrained_resnet50 after 40738557: 40738561
+submit_train_ham10000_lesion_white_cnn after 40738557: 40738562
+submit_train_ham10000_lesion_white_vit after 40738557: 40738563
+submit_train_ham10000_lesion_white_resnet after 40738557: 40738564
+submit_train_ham10000_lesion_white_pretrained_resnet50 after 40738557: 40738565
+submit_train_pad_ufes20_full_image_resnet after 40738557: 40738566
+evaluate_pad_ufes20_full_image_models after all training jobs: 40738567
+evaluate_pad_ufes20_lesion_white_models after all training jobs: 40738568
+Pipeline submitted.
+Slurm dependencies enforce: create data -> train segmentation -> create lesion-white data -> train classifiers -> evaluate PAD-UFES-20.
+Pipeline submitter finished on Mon May 11 01:15:43 EDT 2026

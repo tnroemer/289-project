@@ -1,0 +1,43 @@
+wandb: [wandb.login()] Using explicit session credentials for https://api.wandb.ai.
+wandb: Appending key for api.wandb.ai to your netrc file: /jet/home/troemer/.netrc
+wandb: Currently logged in as: tnroemer (tnroemer-berk) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.26.1
+wandb: Run data is saved locally in /ocean/projects/mth250011p/troemer/wandb/wandb/run-20260511_023223-4pvf836p
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run resnet-lesion-white
+wandb: ⭐️ View project at https://wandb.ai/tnroemer-berk/skin-cancer-cnn
+wandb: 🚀 View run at https://wandb.ai/tnroemer-berk/skin-cancer-cnn/runs/4pvf836p
+wandb: WARNING Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: updating run metadata
+wandb: 
+wandb: Run history:
+wandb:                  epoch ▁▁▁▁▂▂▂▂▃▃▃▃▃▃▃▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▆▇▇▇▇▇███
+wandb:          learning_rate ████████▇▇▇▇▇▇▇▆▆▆▅▅▅▄▄▄▄▃▃▃▃▂▂▂▂▂▂▁▁▁▁▁
+wandb:          test/accuracy ▁
+wandb: test/balanced_accuracy ▁
+wandb:                test/f1 ▁
+wandb:              test/loss ▁
+wandb:         test/precision ▁
+wandb:       test/sensitivity ▁
+wandb:       test/specificity ▁
+wandb:             train/loss █▇▇▆▅▅▅▅▄▅▄▄▄▄▄▃▃▃▃▃▂▃▃▂▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁
+wandb:                    +16 ...
+wandb: 
+wandb: Run summary:
+wandb:                 best_epoch 40
+wandb:          best_val_accuracy 0.71175
+wandb: best_val_balanced_accuracy 0.78271
+wandb:                best_val_f1 0.55579
+wandb:         best_val_precision 0.40183
+wandb:       best_val_sensitivity 0.90102
+wandb:       best_val_specificity 0.66439
+wandb:         best_val_threshold 0.43003
+wandb:                      epoch 60
+wandb:              learning_rate 0.0
+wandb:                        +32 ...
+wandb: 
+wandb: 🚀 View run resnet-lesion-white at: https://wandb.ai/tnroemer-berk/skin-cancer-cnn/runs/4pvf836p
+wandb: ⭐️ View project at: https://wandb.ai/tnroemer-berk/skin-cancer-cnn
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 1 other file(s)
+wandb: Find logs at: /ocean/projects/mth250011p/troemer/wandb/wandb/run-20260511_023223-4pvf836p/logs

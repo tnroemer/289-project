@@ -1,0 +1,98 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/create_data-40738555
+Job started on Mon May 11 01:16:00 EDT 2026
+Running on node: r026.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+Created HAM10000 binary image folder and splits
+Metadata path: /ocean/projects/mth250011p/troemer/datasets/kmader/skin-cancer-mnist-ham10000/versions/2/HAM10000_metadata.csv
+Copied HAM images: 0
+Already existed: 9758
+Missing HAM full images: 0
+Kept HAM labels: ['akiec', 'bcc', 'bkl', 'mel', 'nv']
+Binary mapping: {'akiec': 'malignant', 'bcc': 'malignant', 'bkl': 'benign', 'mel': 'malignant', 'nv': 'benign'}
+Train counts:
+dx
+akiec     229
+bcc       360
+bkl       769
+mel       779
+nv       4693
+Name: count, dtype: int64
+Train binary counts:
+binary_class
+benign       5462
+malignant    1368
+Name: count, dtype: int64
+Val counts:
+dx
+akiec      49
+bcc        77
+bkl       165
+mel       167
+nv       1006
+Name: count, dtype: int64
+Test counts:
+dx
+akiec      49
+bcc        77
+bkl       165
+mel       167
+nv       1006
+Name: count, dtype: int64
+Saved train split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_train.csv
+Saved val split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_val.csv
+Saved test split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/ham10000_test.csv
+Output folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/ham10000-images
+Saved HAM metadata: /ocean/projects/mth250011p/troemer/skin-lesions/data/ham10000-images/metadata.csv
+Created PAD-UFES-20 binary image folder and splits
+Metadata path: /ocean/projects/mth250011p/troemer/datasets/pad-ufes-20/metadata.csv
+Kept overlap diagnoses: ['akiec', 'bcc', 'bkl', 'mel', 'nv']
+PAD mapping: {'ACK': 'akiec', 'BCC': 'bcc', 'SEK': 'bkl', 'MEL': 'mel', 'NEV': 'nv'}
+Binary mapping: {'akiec': 'malignant', 'bcc': 'malignant', 'bkl': 'benign', 'mel': 'malignant', 'nv': 'benign'}
+Copied PAD images: 0
+Already existed: 2106
+Missing PAD source images: 0
+PAD counts:
+dx
+akiec    730
+bcc      845
+bkl      235
+mel       52
+nv       244
+Name: count, dtype: int64
+PAD binary counts:
+binary_class
+benign        479
+malignant    1627
+Name: count, dtype: int64
+Train counts:
+dx
+akiec    510
+bcc      591
+bkl      165
+mel       36
+nv       170
+Name: count, dtype: int64
+Val counts:
+dx
+akiec    110
+bcc      127
+bkl       35
+mel        8
+nv        37
+Name: count, dtype: int64
+Test counts:
+dx
+akiec    110
+bcc      127
+bkl       35
+mel        8
+nv        37
+Name: count, dtype: int64
+Output folder: /ocean/projects/mth250011p/troemer/skin-lesions/data/pad-ufes-20-images
+Saved PAD metadata: /ocean/projects/mth250011p/troemer/skin-lesions/data/pad-ufes-20-images/metadata.csv
+Saved train split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/pad_ufes20_train.csv
+Saved val split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/pad_ufes20_val.csv
+Saved test split to /ocean/projects/mth250011p/troemer/skin-lesions/data/splits/pad_ufes20_test.csv
+Job finished on Mon May 11 01:16:40 EDT 2026

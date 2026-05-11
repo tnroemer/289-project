@@ -1,0 +1,51 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/evaluate_pad_ufes20_full_image_models-40738567
+Job started on Mon May 11 03:49:32 EDT 2026
+Running on node: w005.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+Found PAD-UFES-20 full_image: 2106
+Missing PAD image paths before filtering: 0
+Missing PAD image files before filtering: 0
+PAD dx counts:
+dx
+akiec    730
+bcc      845
+bkl      235
+mel       52
+nv       244
+Name: count, dtype: int64
+PAD binary counts:
+binary_class
+benign        479
+malignant    1627
+Name: count, dtype: int64
+CUDA available: True
+GPU: NVIDIA H100 80GB HBM3
+Evaluating basic_cnn
+basic_cnn sensitivity: 0.4530 | specificity: 0.7850 | threshold: 0.5028
+WARNING: basic_cnn sensitivity is below target 0.90 on PAD-UFES-20 full_image.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_full_image_basic_cnn_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_full_image_basic_cnn_metrics.csv
+Evaluating vit
+vit sensitivity: 0.7849 | specificity: 0.4760 | threshold: 0.4808
+WARNING: vit sensitivity is below target 0.90 on PAD-UFES-20 full_image.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_full_image_vit_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_full_image_vit_metrics.csv
+Evaluating resnet
+resnet sensitivity: 0.4444 | specificity: 0.8058 | threshold: 0.5258
+WARNING: resnet sensitivity is below target 0.90 on PAD-UFES-20 full_image.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_full_image_resnet_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_full_image_resnet_metrics.csv
+Evaluating pretrained_resnet50
+pretrained_resnet50 sensitivity: 0.6220 | specificity: 0.7662 | threshold: 0.4942
+WARNING: pretrained_resnet50 sensitivity is below target 0.90 on PAD-UFES-20 full_image.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_full_image_pretrained_resnet50_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_full_image_pretrained_resnet50_metrics.csv
+Evaluating full_image ensemble
+Ensemble HAM validation sensitivity: 0.9010 | specificity: 0.7728 | threshold: 0.5472
+ensemble sensitivity: 0.5784 | specificity: 0.8288 | threshold: 0.5472
+WARNING: ensemble sensitivity is below target 0.90 on PAD-UFES-20 full_image.
+Saved predictions to /ocean/projects/mth250011p/troemer/skin-lesions/preds/pad_ufes_20_full_image_ensemble_predictions.csv
+Saved metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/pad_ufes_20_full_image_ensemble_metrics.csv
+Job finished on Mon May 11 03:51:58 EDT 2026
