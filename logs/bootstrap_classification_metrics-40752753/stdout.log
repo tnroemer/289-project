@@ -1,0 +1,27 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/bootstrap_classification_metrics-40752753
+Job started on Mon May 11 13:51:41 EDT 2026
+Running on node: r200.ib.bridges2.psc.edu
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
+Python version: Python 3.14.3
+basic_cnn_lesion_white_test | sens mean=0.9112 se=0.0167 | spec mean=0.6936 se=0.0132
+basic_cnn_test | sens mean=0.8364 se=0.0220 | spec mean=0.7266 se=0.0129
+pad_ufes20_resnet_test | sens mean=0.8979 se=0.0196 | spec mean=0.6104 se=0.0579
+pad_ufes_20_full_image_basic_cnn | sens mean=0.4527 se=0.0125 | spec mean=0.7849 se=0.0184
+pad_ufes_20_full_image_ensemble | sens mean=0.5782 se=0.0122 | spec mean=0.8286 se=0.0173
+pad_ufes_20_full_image_pretrained_resnet50 | sens mean=0.6220 se=0.0121 | spec mean=0.7663 se=0.0195
+pad_ufes_20_full_image_resnet | sens mean=0.4445 se=0.0124 | spec mean=0.8060 se=0.0181
+pad_ufes_20_full_image_vit | sens mean=0.7848 se=0.0102 | spec mean=0.4760 se=0.0224
+pad_ufes_20_lesion_white_basic_cnn_lesion_white | sens mean=0.5045 se=0.0123 | spec mean=0.8683 se=0.0156
+pad_ufes_20_lesion_white_ensemble | sens mean=0.6349 se=0.0120 | spec mean=0.7808 se=0.0187
+pad_ufes_20_lesion_white_pretrained_resnet50_lesion_white | sens mean=0.6694 se=0.0117 | spec mean=0.6220 se=0.0222
+pad_ufes_20_lesion_white_resnet_lesion_white | sens mean=0.5034 se=0.0123 | spec mean=0.8355 se=0.0167
+pad_ufes_20_lesion_white_vit_lesion_white | sens mean=0.7464 se=0.0106 | spec mean=0.4758 se=0.0229
+pretrained_resnet50_lesion_white_test | sens mean=0.8771 se=0.0191 | spec mean=0.8012 se=0.0116
+pretrained_resnet50_test | sens mean=0.8468 se=0.0207 | spec mean=0.8149 se=0.0116
+resnet_lesion_white_test | sens mean=0.9111 se=0.0167 | spec mean=0.6732 se=0.0139
+resnet_test | sens mean=0.8869 se=0.0187 | spec mean=0.6858 se=0.0135
+vit_lesion_white_test | sens mean=0.8637 se=0.0202 | spec mean=0.6808 se=0.0136
+vit_test | sens mean=0.8437 se=0.0211 | spec mean=0.7260 se=0.0129
+Saved bootstrap metrics to /ocean/projects/mth250011p/troemer/skin-lesions/metrics/classification_bootstrap_metrics.csv
+Job finished on Mon May 11 13:51:52 EDT 2026

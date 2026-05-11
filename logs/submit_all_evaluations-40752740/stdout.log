@@ -1,0 +1,6 @@
+Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/submit_all_evaluations-40752740
+Submitting all evaluation jobs on Mon May 11 13:49:37 EDT 2026
+Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
+submit_evaluate_pad_ufes20_full_image_models: 40752742
+submit_evaluate_pad_ufes20_lesion_white_models: 40752743
+All evaluation jobs submitted on Mon May 11 13:49:37 EDT 2026.
