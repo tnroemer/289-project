@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
+from models.lora import is_lora_parameter_name
 from models.model_architectures import build_model
 
 
@@ -80,6 +81,177 @@ MODEL_SETTINGS = {
         "unfreeze_layer4_epoch": 6,
         "use_pretrained_backbone": True,
         "finetune": "head_then_layer4",
+    },
+    # ------------------------------------------------------------------
+    # ImageNet-pretrained backbones, two finetune variants each.
+    # checkpoint_name == model_type so the filename suffix stays unambiguous
+    # for bootstrap.py's parser (which strips a known suffix list, not a
+    # greedy split). display_name uses hyphens for W&B readability.
+    # head : freeze backbone, replace head with fresh Linear, train head only.
+    # lora : freeze backbone, inject LoRA on a backbone-specific subtree,
+    #        train LoRA A/B + fresh head.
+    # ------------------------------------------------------------------
+    "resnet18_head": {
+        "display_name": "resnet18-head",
+        "checkpoint_name": "resnet18_head",
+        "model": "ImageNetResNet18HeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "resnet18_lora": {
+        "display_name": "resnet18-lora",
+        "checkpoint_name": "resnet18_lora",
+        "model": "ImageNetResNet18LoRA(layer4)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    "alexnet_head": {
+        "display_name": "alexnet-head",
+        "checkpoint_name": "alexnet_head",
+        "model": "ImageNetAlexNetHeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "alexnet_lora": {
+        "display_name": "alexnet-lora",
+        "checkpoint_name": "alexnet_lora",
+        "model": "ImageNetAlexNetLoRA(conv8,conv10,fc1,fc4)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    "densenet121_head": {
+        "display_name": "densenet121-head",
+        "checkpoint_name": "densenet121_head",
+        "model": "ImageNetDenseNet121HeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "densenet121_lora": {
+        "display_name": "densenet121-lora",
+        "checkpoint_name": "densenet121_lora",
+        "model": "ImageNetDenseNet121LoRA(denseblock4)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    "efficientnet_b0_head": {
+        "display_name": "efficientnet_b0-head",
+        "checkpoint_name": "efficientnet_b0_head",
+        "model": "ImageNetEfficientNetB0HeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "efficientnet_b0_lora": {
+        "display_name": "efficientnet_b0-lora",
+        "checkpoint_name": "efficientnet_b0_lora",
+        "model": "ImageNetEfficientNetB0LoRA(features7+8)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    "convnext_tiny_head": {
+        "display_name": "convnext_tiny-head",
+        "checkpoint_name": "convnext_tiny_head",
+        "model": "ImageNetConvNeXtTinyHeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "convnext_tiny_lora": {
+        "display_name": "convnext_tiny-lora",
+        "checkpoint_name": "convnext_tiny_lora",
+        "model": "ImageNetConvNeXtTinyLoRA(features7)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    "vgg16_head": {
+        "display_name": "vgg16-head",
+        "checkpoint_name": "vgg16_head",
+        "model": "ImageNetVGG16HeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+        "batch_size": 16,  # 138M params -> halve batch to fit single GPU
+    },
+    "vgg16_lora": {
+        "display_name": "vgg16-lora",
+        "checkpoint_name": "vgg16_lora",
+        "model": "ImageNetVGG16LoRA(conv26,conv28,fc0,fc3)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "batch_size": 16,
+    },
+    "googlenet_head": {
+        "display_name": "googlenet-head",
+        "checkpoint_name": "googlenet_head",
+        "model": "ImageNetGoogLeNetHeadOnly",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "use_pretrained_backbone": True,
+        "finetune": "head_only",
+    },
+    "googlenet_lora": {
+        "display_name": "googlenet-lora",
+        "checkpoint_name": "googlenet_lora",
+        "model": "ImageNetGoogLeNetLoRA(inception5a+5b)",
+        "image_size": 224,
+        "learning_rate": 1e-3,
+        "backbone_learning_rate": 1e-4,
+        "use_pretrained_backbone": True,
+        "finetune": "lora",
+        "lora_rank": 8,
+        "lora_alpha": 16,
+    },
+    # ------------------------------------------------------------------
+    # Small-capacity baseline trained from scratch (no torchvision weights).
+    # Uses BasicCNN's normalization (ImageNet stats) for input consistency.
+    # ------------------------------------------------------------------
+    "lenet5": {
+        "display_name": "lenet5",
+        "checkpoint_name": "lenet5",
+        "model": "LeNet5",
+        "image_size": 224,
+        "learning_rate": 3e-4,
+        "use_pretrained_backbone": False,
+        "finetune": "scratch",
     },
 }
 
@@ -560,9 +732,10 @@ def wandb_metrics(prefix, metrics):
     return rows
 
 
-def print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics):
+def print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics, total_epochs=None):
+    total = total_epochs if total_epochs is not None else num_epochs
     print(
-        f"Epoch {epoch}/{num_epochs} | "
+        f"Epoch {epoch}/{total} | "
         f"Train Loss: {train_metrics['loss']:.4f} | "
         f"Val Loss: {val_metrics['loss']:.4f} | "
         f"Val Threshold: {val_threshold:.4f} | "
@@ -584,6 +757,16 @@ def train_ham10000_model(model_type, image_source):
     image_size = settings["image_size"]
     learning_rate = settings["learning_rate"]
 
+    # Per-model overrides for previously-hardcoded knobs. Defaults match the
+    # module-level constants so existing entries (cnn, vit, resnet,
+    # pretrained_resnet50) keep their current behavior unchanged.
+    local_batch_size = settings.get("batch_size", batch_size)
+    local_num_epochs = settings.get("num_epochs", num_epochs)
+    local_num_workers = settings.get("num_workers", num_workers)
+    local_weight_decay = settings.get("weight_decay", 1e-4)
+    local_patience = settings.get("early_stopping_patience", 20)
+    finetune_mode = settings.get("finetune")
+
     if image_source == "full_image":
         model_name = settings["checkpoint_name"]
         wandb_name = settings["display_name"]
@@ -600,23 +783,23 @@ def train_ham10000_model(model_type, image_source):
 
     train_loader = DataLoader(
         train_ds,
-        batch_size=batch_size,
+        batch_size=local_batch_size,
         shuffle=True,
-        num_workers=num_workers,
+        num_workers=local_num_workers,
         pin_memory=torch.cuda.is_available(),
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=batch_size,
+        batch_size=local_batch_size,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=local_num_workers,
         pin_memory=torch.cuda.is_available(),
     )
     test_loader = DataLoader(
         test_ds,
-        batch_size=batch_size,
+        batch_size=local_batch_size,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=local_num_workers,
         pin_memory=torch.cuda.is_available(),
     )
 
@@ -636,16 +819,19 @@ def train_ham10000_model(model_type, image_source):
         "image_source": image_source,
         "run_dir": RUN_DIR,
         "split_dir": SPLIT_DIR,
-        "batch_size": batch_size,
+        "batch_size": local_batch_size,
         "learning_rate": learning_rate,
-        "epochs": num_epochs,
+        "epochs": local_num_epochs,
         "image_size": image_size,
         "num_classes": 1,
-        "num_workers": num_workers,
+        "num_workers": local_num_workers,
         "loss": "BCEWithLogitsLoss",
         "pos_weight": pos_weight,
         "pos_weight_note": "number of benign training examples divided by number of malignant training examples",
+        "optimizer": "AdamW",
+        "weight_decay": local_weight_decay,
         "scheduler": "cosine_annealing_lr",
+        "early_stopping_patience": local_patience,
         "target_sensitivity": TARGET_SENSITIVITY,
         "threshold_selection": "validation_threshold_for_target_sensitivity_after_training",
         "model_selection": "highest_validation_specificity_at_target_sensitivity",
@@ -666,6 +852,9 @@ def train_ham10000_model(model_type, image_source):
         "backbone_learning_rate",
         "unfreeze_layer4_epoch",
         "finetune",
+        "lora_rank",
+        "lora_alpha",
+        "lora_dropout",
     ]:
         if key in settings:
             config[key] = settings[key]
@@ -684,7 +873,7 @@ def train_ham10000_model(model_type, image_source):
     pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32, device=device)
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
-    if model_type == "pretrained_resnet50" and settings.get("finetune") == "head_then_layer4":
+    if finetune_mode == "head_then_layer4":
         head_parameters = [parameter for parameter in model.fc.parameters() if parameter.requires_grad]
         layer4_parameters = list(model.layer4.parameters())
         optimizer = AdamW(
@@ -692,14 +881,38 @@ def train_ham10000_model(model_type, image_source):
                 {"params": head_parameters, "lr": learning_rate},
                 {"params": layer4_parameters, "lr": settings["backbone_learning_rate"]},
             ],
-            weight_decay=1e-4,
+            weight_decay=local_weight_decay,
         )
         trainable_parameters = head_parameters
+    elif finetune_mode == "lora":
+        head_params = []
+        lora_params = []
+        for parameter_name, parameter in model.named_parameters():
+            if not parameter.requires_grad:
+                continue
+            if is_lora_parameter_name(parameter_name):
+                lora_params.append(parameter)
+            else:
+                head_params.append(parameter)
+        if not lora_params:
+            raise RuntimeError(
+                f"finetune=lora but no LoRA parameters found in {model_type}. "
+                "Check that build_model injected LoRA wrappers."
+            )
+        optimizer = AdamW(
+            [
+                {"params": head_params, "lr": learning_rate},
+                {"params": lora_params, "lr": settings["backbone_learning_rate"]},
+            ],
+            weight_decay=local_weight_decay,
+        )
+        trainable_parameters = head_params + lora_params
     else:
+        # head_only, scratch, or unset: one parameter group at head LR.
         trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-        optimizer = AdamW(trainable_parameters, lr=learning_rate, weight_decay=1e-4)
+        optimizer = AdamW(trainable_parameters, lr=learning_rate, weight_decay=local_weight_decay)
 
-    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+    scheduler = CosineAnnealingLR(optimizer, T_max=local_num_epochs)
 
     print(f"Trainable parameters: {sum(parameter.numel() for parameter in trainable_parameters)}")
 
@@ -712,21 +925,20 @@ def train_ham10000_model(model_type, image_source):
     metrics_path = os.path.join(METRICS_DIR, f"{model_name}_test_metrics.csv")
 
     best_val_specificity = -1.0
-    patience = 20
+    patience = local_patience
     epochs_without_improvement = 0
     layer4_unfrozen = False
 
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(1, local_num_epochs + 1):
         if (
-            model_type == "pretrained_resnet50"
-            and settings.get("finetune") == "head_then_layer4"
+            finetune_mode == "head_then_layer4"
             and not layer4_unfrozen
             and epoch >= settings["unfreeze_layer4_epoch"]
         ):
             for parameter in model.layer4.parameters():
                 parameter.requires_grad = True
             layer4_unfrozen = True
-            print(f"Unfroze pretrained ResNet50 layer4 at epoch {epoch}.")
+            print(f"Unfroze pretrained {model_type} layer4 at epoch {epoch}.")
 
         train_metrics = train_one_epoch(
             model,
@@ -763,7 +975,7 @@ def train_ham10000_model(model_type, image_source):
         })
         wandb.log(log_row)
 
-        print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics)
+        print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics, total_epochs=local_num_epochs)
 
         val_specificity = val_threshold_metrics["specificity"]
         if val_specificity > best_val_specificity:

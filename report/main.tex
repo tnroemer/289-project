@@ -1,0 +1,487 @@
+% CS 289A Final Report — Lesion-Focused Classification for Skin Cancer Detection
+%
+% Drafting notes:
+%   - Single-column article, ~6-10 pages (instructions/sp26-grad-project.pdf).
+%   - Plan: swap in icml2024.sty (or similar) before submission. Vanilla article keeps
+%     this compilable in any TeX setup while drafting.
+%   - \todo{...} markers flag sections that still need experiments, figures, or numbers.
+%     Real numbers below come from metrics/classification_bootstrap_metrics.csv (HEAD).
+
+\documentclass[10pt]{article}
+
+\usepackage[letterpaper, margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{cleveref}
+\usepackage{caption}
+
+% Lightweight TODO marker (no todonotes dependency).
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:} #1\textbf{]}}}
+
+\title{Lesion-Focused Classification for Skin Cancer Detection:\\
+Does Background Suppression Help Generalization?}
+\author{Tobias Roemer \and Thomas Lee \and Leo Li\\
+CS 289A, Spring 2026}
+\date{May 15, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Skin lesion classifiers trained end-to-end on dermoscopic images may rely on
+non-lesion context --- skin texture, hair, lighting, imaging artifacts --- rather
+than on the lesion itself. We test whether \emph{explicitly localizing the lesion
+before classification} improves performance and out-of-distribution
+generalization. We train a DeepLabV3-ResNet50 segmenter on ISIC 2018 lesion
+masks, use it to produce lesion-on-white versions of every HAM10000 image, and
+fine-tune four classifiers (a basic CNN, a small ViT, a from-scratch ResNet, and
+an ImageNet-pretrained ResNet-50) on the full-image and lesion-white inputs
+under matched training conditions. We evaluate on a held-out HAM10000 test set
+and on PAD-UFES-20, a clinical-photograph dataset with substantially different
+imaging characteristics, with sensitivity and specificity reported using
+non-parametric bootstrap confidence intervals at a target sensitivity of
+$0.90$. \todo{One-sentence punchline once we settle on the headline number ---
+likely: lesion-white inputs preserve in-domain performance and improve specificity
+on PAD-UFES-20 for non-pretrained models, but the ImageNet-pretrained ResNet-50
+narrows the gap.}
+\end{abstract}
+
+% ============================================================================
+\section{Problem Definition}
+\label{sec:problem}
+
+Skin lesion classification from dermoscopic images is an established benchmark
+problem in medical computer vision and a practical target for early skin cancer
+screening~\citep{esteva2017dermatologist, tschandl2018ham10000}. The standard
+pipeline fine-tunes a convolutional network on the raw lesion image and predicts
+the diagnostic label directly. A persistent concern with this pipeline is that
+the network does not learn lesion-specific features but instead exploits
+correlated context: the dermoscope vignette, the presence of rulers or ink
+markings, body-site appearance, the patient's skin tone, or lighting
+artifacts~\citep{winkler2019association, bissoto2019skin}. Such shortcuts can
+produce high accuracy on the training distribution but fail when the imaging
+setup changes, which is precisely what happens when a model trained on
+hospital-grade dermoscopy is asked to score a smartphone photograph.
+
+We ask a single experimental question:
+
+\begin{quote}
+\emph{Does explicitly localizing the lesion --- so that the classifier only sees
+the lesion pixels on a uniform background --- improve binary
+benign-vs-malignant classification, both in-distribution (HAM10000) and under
+distribution shift to a different imaging modality (PAD-UFES-20)?}
+\end{quote}
+
+We isolate the effect of lesion-focusing by holding everything else constant
+between the full-image and lesion-focused pipelines: the same backbone
+architectures, the same training data, the same augmentation, the same loss,
+the same threshold-selection procedure, and the same evaluation splits and
+bootstrap protocol. The only thing that changes is whether the input has its
+non-lesion background replaced with white before training and inference.
+
+% ============================================================================
+\section{Connection to Course Content}
+\label{sec:course}
+
+This project draws on several concepts covered in lecture:
+\begin{itemize}
+  \item \textbf{Convolutional networks and transfer learning.} Our baselines
+  are small CNN and ResNet architectures, and our strongest model is an
+  ImageNet-pretrained ResNet-50 fine-tuned in a two-phase
+  schedule~\citep{he2016deep}.
+  \item \textbf{Vision Transformers.} We include a small ViT
+  baseline~\citep{dosovitskiy2020vit} trained from scratch under the same
+  conditions to test whether the lesion-focusing effect is architecture-specific.
+  \item \textbf{Imbalanced classification.} HAM10000 has roughly four times
+  more benign than malignant overlap-label cases. We use
+  \texttt{BCEWithLogitsLoss} with \verb|pos_weight| equal to the
+  negative-to-positive ratio in the training split and select the decision
+  threshold on the validation set to hit a target sensitivity.
+  \item \textbf{Generalization and distribution shift.} The lesion-focused
+  pipeline is, in effect, a hand-coded invariance: we strip background pixels
+  so the classifier cannot use them. The OOD evaluation on PAD-UFES-20 is a
+  direct test of whether that invariance is useful.
+  \item \textbf{Bootstrap uncertainty quantification.} We report 95\%
+  bootstrap CIs (5000 resamples) for sensitivity and specificity rather than
+  point estimates, so claims about which model is ``better'' can be checked
+  against confidence intervals.
+\end{itemize}
+
+% ============================================================================
+\section{Prior Work}
+\label{sec:prior}
+
+\paragraph{End-to-end skin lesion classification.}
+\citet{esteva2017dermatologist} showed dermatologist-level skin-cancer
+classification with a single InceptionV3 fine-tuned on $\sim$130k dermoscopic
+and clinical images. Subsequent work on the ISIC challenge datasets
+\citep{codella2019isic, combalia2019bcn20000} extended this to deeper networks,
+ensembles, and multi-task training. These models classify directly from the full
+image.
+
+\paragraph{Shortcut learning in dermoscopy.}
+Several studies have documented that dermoscopic classifiers rely on
+non-lesion features. \citet{winkler2019association} showed that surgical ink
+markings systematically biased malignancy predictions.
+\citet{bissoto2019skin} found that classifiers retained substantial accuracy
+when the lesion itself was masked out, indicating heavy use of context cues.
+This motivates the question we study: does explicitly removing background
+context help generalization?
+
+\paragraph{Lesion segmentation as a preprocessing step.}
+The ISIC 2018 Task 1 challenge~\citep{codella2019isic} popularized binary
+lesion segmentation, with U-Net and DeepLabV3 variants~\citep{chen2017deeplab}
+performing well. Several skin classification pipelines have used segmenters
+as an attention or cropping stage~\citep{yu2017automated, gonzalez2018dermaknet},
+but typically as part of a multi-task or multi-stream architecture rather than
+as a controlled comparison.
+
+\paragraph{Cross-dataset evaluation.}
+Generalization across dermoscopy and clinical-photograph datasets has been
+studied directly in works such as
+\citet{pacheco2020pad, daneshjou2022disparities}, which find non-trivial drops
+between in-distribution and OOD test performance. PAD-UFES-20 is a useful test
+bed for the present study because its images come from smartphone cameras under
+unstandardized conditions, so the non-lesion context is qualitatively different
+from HAM10000.
+
+\paragraph{What is missing.} What we did not find is a clean, controlled,
+matched-conditions comparison of full-image vs.\ lesion-focused classification
+across multiple architectures with the same training pipeline and OOD test set.
+That is the gap our contribution fills.
+
+% ============================================================================
+\section{Approach}
+\label{sec:approach}
+
+\subsection{Datasets}
+\label{sec:data}
+
+\textbf{HAM10000}~\citep{tschandl2018ham10000} contains 10{,}015 dermoscopic
+images across seven diagnostic categories. We restrict to the five labels
+that have a meaningful counterpart in PAD-UFES-20 (\verb|akiec, bcc, bkl, mel,
+nv|) and map them to a binary benign/malignant target using the standard
+clinical grouping (\verb|bkl, nv| $\to$ benign; the rest $\to$ malignant).
+We stratify-split by diagnosis into train/val/test (70/15/15, seed 42),
+yielding $|D_{\text{test}}|=1464$ HAM images with 293 malignant and 1171
+benign cases.
+
+\textbf{ISIC 2018 Task 1}~\citep{codella2019isic} provides binary lesion masks
+for $\sim$2{,}600 dermoscopic images. We use it to train the segmenter that
+generates lesion masks for HAM10000.
+
+\textbf{PAD-UFES-20}~\citep{pacheco2020pad} contains 2{,}298 clinical
+(smartphone) photographs labeled across six diagnoses. We keep records whose
+diagnosis maps onto the same five HAM categories above and apply the same
+benign/malignant mapping, yielding 2{,}106 images for cross-domain evaluation
+(1{,}627 malignant, 479 benign --- the class balance is essentially flipped
+relative to HAM10000).
+
+\subsection{Lesion Segmentation}
+\label{sec:seg}
+
+We train a DeepLabV3-ResNet50~\citep{chen2017deeplab} for binary lesion
+segmentation on ISIC 2018 Task 1 at $320\times320$, with the classifier and
+auxiliary heads reduced to one output channel. Optimization uses AdamW
+($\text{lr}=10^{-4}$) with cosine annealing over 40 epochs, batch size 8, the
+standard ImageNet normalization, and light geometric and color augmentation
+(flips, $k\cdot 90^\circ$ rotations, color jitter). The model selected on
+validation IoU reaches \textbf{test Dice $0.909$ and test IoU $0.857$}
+(epoch 14; see \verb|metrics/segmentation_deeplabv3_resnet50_metrics.csv|).
+
+To produce lesion-focused inputs, we run the trained segmenter over every
+HAM10000 image, threshold the predicted probability map at $0.5$, and use the
+mask to composite the original image onto a white background. We do the same
+for PAD-UFES-20.
+
+\subsection{Classifiers}
+\label{sec:cls}
+
+We train four binary classifiers under identical conditions:
+\begin{itemize}
+  \item \textbf{BasicCNN.} A 4-block conv stack with batch norm, ReLU, max
+  pooling, and dropout, followed by global average pooling and an MLP head.
+  \item \textbf{ViT (small).} A from-scratch ViT with patch size 16,
+  embedding dimension 192, depth 6, 6 heads, MLP dimension 384, dropout 0.15.
+  \item \textbf{SimpleResNet.} A from-scratch ResNet with four stages of
+  basic blocks ($32\to64\to128\to256$ channels).
+  \item \textbf{Pretrained ResNet-50.} ImageNet-initialized
+  ResNet-50~\citep{he2016deep} with a replaced binary head. Training uses a
+  two-phase schedule: the head is trained alone for the first 6 epochs while
+  the backbone is frozen, then \texttt{layer4} is unfrozen and trained at a
+  smaller learning rate ($10^{-5}$) for the remainder. Batch-norm modules are
+  kept in eval mode whenever the backbone is frozen.
+\end{itemize}
+
+All classifiers take a $224\times224$ RGB image, output a single logit, and are
+trained with \verb|BCEWithLogitsLoss| using
+\verb|pos_weight = #benign_train / #malignant_train|. Optimization is AdamW
+(weight decay $10^{-4}$) with cosine annealing over 60 epochs and early
+stopping (patience 20) on the validation specificity at target sensitivity.
+The training augmentation pipeline is: resize to $1.15\times$, random
+resized crop, horizontal/vertical flips, $\pm 45^\circ$ rotation, small
+affine translation/scale/shear, mild perspective, color jitter, occasional
+grayscale conversion, and mild Gaussian blur, followed by ImageNet
+normalization.
+
+\subsection{Threshold selection and evaluation}
+\label{sec:eval}
+
+A binary classifier's operating point matters more than its raw accuracy in a
+clinical setting. We fix a \emph{target sensitivity} of $0.90$ and, on the
+validation set, sweep all candidate thresholds (the empirical score values plus
+$\{0,1\}$) to find the threshold that achieves at least $0.90$ sensitivity with
+the highest possible specificity. We save the checkpoint with the best such
+validation specificity and re-tune the threshold on validation scores from that
+checkpoint before applying it to the test set. The same protocol is applied
+identically to every model.
+
+We report sensitivity and specificity at this operating point, together with
+95\% bootstrap confidence intervals (5000 resamples, seed 42) constructed by
+resampling the test set with replacement.
+
+\subsection{Cross-domain evaluation}
+We apply each HAM10000-trained classifier to PAD-UFES-20 \emph{without
+retraining}: the model trained on HAM10000 full images is evaluated on
+PAD-UFES-20 full images, and the model trained on HAM10000 lesion-white images
+is evaluated on PAD-UFES-20 lesion-white images (generated with the same ISIC
+segmenter). For reference we also train a separate ResNet directly on a
+PAD-UFES-20 train split so we know what an in-domain PAD model looks like.
+
+\subsection{Implementation and infrastructure}
+The codebase is Python 3.11 with PyTorch and torchvision. Each $(model_type,
+image_source)$ pair is launched by a thin wrapper that calls a shared trainer
+(\verb|src/training/ham10000_training.py|) so the four architectures share
+exactly the same data, loss, scheduler, threshold-selection, and logging code.
+Training runs on a single GPU on PSC Bridges-2 via SLURM
+(\verb|submit/submit_full_pipeline.sh| chains the entire pipeline with
+\verb|--dependency=afterok|). All experiments are logged to Weights \& Biases.
+
+% ============================================================================
+\section{Our Contribution}
+\label{sec:contrib}
+
+The contribution of this project is a \emph{controlled, matched-conditions
+comparison} of full-image vs.\ lesion-focused classification across four
+architectures, evaluated both in-distribution (HAM10000) and under a real
+distribution shift (PAD-UFES-20). Concretely:
+
+\begin{enumerate}
+  \item We pair each backbone with itself: every architecture is trained twice,
+  once on full HAM10000 images and once on lesion-white HAM10000 images, with
+  every other knob held fixed. This isolates the effect of the lesion-focusing
+  preprocessing.
+  \item We use a \emph{single, automatically-derived} lesion mask (from a
+  DeepLabV3 segmenter trained on ISIC) rather than the gold ISIC masks
+  themselves. This is the realistic deployment setting --- in practice the
+  upstream segmenter is not perfect --- and it tests whether the lesion-focusing
+  effect survives realistic mask noise.
+  \item We use a clinically motivated operating point (specificity at
+  $\geq 0.90$ sensitivity) and report \emph{bootstrap CIs} for every reported
+  number, so claims about ``which input is better'' are properly hedged.
+  \item We test cross-dataset generalization to PAD-UFES-20, whose imaging
+  modality is fundamentally different (smartphone vs.\ dermoscope), and
+  compare each model's HAM-trained, PAD-evaluated numbers under both input
+  pipelines.
+  \item \todo{Robustness-under-corruption experiment promised in the proposal
+  (blur, noise, brightness shifts at several severities). Designed; not yet
+  run. Slot reserved in \cref{sec:results}.}
+  \item \todo{Error analysis. Currently planning: per-diagnosis confusion
+  breakdown, and qualitative inspection of the cases where lesion-white flips
+  the prediction relative to full-image, stratified by segmenter quality
+  (Dice on the ISIC-style proxy mask).}
+\end{enumerate}
+
+% ============================================================================
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Lesion segmentation}
+The DeepLabV3-ResNet50 segmenter reaches test \textbf{Dice $0.909$} and
+\textbf{IoU $0.857$} on the held-out ISIC 2018 Task 1 split.
+\todo{Figure 1: 2$\times$4 grid of (input image, ground-truth mask, predicted
+mask, lesion-white composite) on 4 representative HAM10000 images, including
+one failure case where the segmenter under- or over-segments.}
+
+\subsection{In-distribution classification (HAM10000 test set)}
+
+\Cref{tab:ham_test} reports test sensitivity and specificity for every model on
+the 1{,}464-image HAM10000 test set at the validation-tuned threshold. Each
+cell is the bootstrap mean with the 95\% percentile CI.
+
+\begin{table}[t]
+\centering
+\caption{HAM10000 test performance (n=1464). Threshold selected on validation
+to hit sensitivity $\geq 0.90$; values are bootstrap mean (95\% CI) over 5000
+resamples. ``Full'' = trained and tested on raw HAM10000 images; ``Lesion''
+= trained and tested on the segmenter's lesion-on-white composites.}
+\label{tab:ham_test}
+\small
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{\textbf{Full image}} & \multicolumn{2}{c}{\textbf{Lesion-white}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Model & Sens & Spec & Sens & Spec \\
+\midrule
+BasicCNN              & 0.836 (0.794, 0.879) & 0.727 (0.701, 0.752) & 0.911 (0.877, 0.943) & 0.694 (0.667, 0.720) \\
+ViT (small)           & 0.844 (0.802, 0.884) & 0.726 (0.700, 0.751) & 0.864 (0.822, 0.902) & 0.681 (0.653, 0.707) \\
+SimpleResNet          & 0.887 (0.848, 0.922) & 0.686 (0.659, 0.712) & 0.911 (0.877, 0.943) & 0.673 (0.646, 0.701) \\
+Pretrained ResNet-50  & 0.847 (0.804, 0.885) & 0.815 (0.792, 0.837) & 0.877 (0.838, 0.913) & 0.801 (0.778, 0.824) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Headline observations.}
+\begin{itemize}
+\item Lesion-white training \emph{raises sensitivity} for three of the four
+backbones (BasicCNN: $0.836 \!\to\! 0.911$; SimpleResNet: $0.887 \!\to\!
+0.911$; pretrained ResNet-50: $0.847 \!\to\! 0.877$), and the CIs for the
+non-pretrained models are essentially disjoint from their full-image
+counterparts.
+\item Specificity is mostly \emph{unchanged or slightly worse} on lesion-white
+inputs in-distribution, suggesting that the threshold is being pulled to a
+more aggressive point to hit target sensitivity once the model has fewer
+context cues to lean on.
+\item The pretrained ResNet-50 is the strongest single model on either input
+($\sim 0.80$ specificity at $\geq 0.85$ sensitivity), consistent with the
+expectation that ImageNet features carry most of the heavy lifting on a
+dataset of this size.
+\end{itemize}
+
+\subsection{Cross-domain generalization (PAD-UFES-20)}
+
+\Cref{tab:pad_test} reports the same metrics when each HAM10000-trained model
+is applied to PAD-UFES-20 (2{,}106 images, 1{,}627 malignant). The threshold
+is the one chosen on the HAM10000 validation set --- it is \emph{not}
+re-tuned for PAD-UFES-20 ---  because in deployment you do not have a
+labeled PAD-UFES-20 set on which to recalibrate.
+
+\begin{table}[t]
+\centering
+\caption{PAD-UFES-20 cross-domain performance (n=2106). Models trained only on
+HAM10000 in the indicated image format and applied to PAD-UFES-20 without
+recalibration. Bootstrap mean (95\% CI), 5000 resamples.}
+\label{tab:pad_test}
+\small
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{\textbf{Full image}} & \multicolumn{2}{c}{\textbf{Lesion-white}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Model & Sens & Spec & Sens & Spec \\
+\midrule
+BasicCNN              & 0.453 (0.428, 0.477) & 0.785 (0.749, 0.820) & 0.504 (0.480, 0.528) & 0.868 (0.838, 0.899) \\
+ViT (small)           & 0.785 (0.765, 0.805) & 0.476 (0.431, 0.519) & 0.746 (0.726, 0.768) & 0.476 (0.431, 0.520) \\
+SimpleResNet          & 0.444 (0.420, 0.468) & 0.806 (0.769, 0.840) & 0.503 (0.479, 0.527) & 0.836 (0.802, 0.867) \\
+Pretrained ResNet-50  & 0.622 (0.598, 0.645) & 0.766 (0.727, 0.805) & 0.669 (0.646, 0.692) & 0.622 (0.577, 0.665) \\
+\midrule
+Mean ensemble (4 models) & 0.578 (0.554, 0.602) & 0.829 (0.794, 0.861) & 0.635 (0.611, 0.658) & 0.781 (0.745, 0.817) \\
+\midrule
+\emph{ResNet trained on PAD (oracle)} & 0.898 (0.858, 0.934) & 0.611 (0.494, 0.722) & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What we see.}
+\begin{itemize}
+\item Every HAM-trained model loses sensitivity dramatically on PAD-UFES-20
+relative to its in-domain numbers, which is expected: the imaging modality has
+changed completely (smartphone, no dermoscope), and PAD's class balance is
+inverted relative to HAM's.
+\item \textbf{Lesion-white inputs improve sensitivity} on the non-pretrained
+backbones (BasicCNN $+5.1$pp, SimpleResNet $+5.9$pp, pretrained ResNet-50
+$+4.7$pp), \emph{and} preserve or improve specificity for BasicCNN and
+SimpleResNet (BasicCNN: $0.785\!\to\!0.868$). This is the cleanest support for
+the lesion-focusing hypothesis in our data: when the background distribution
+moves out of training, hiding the background helps.
+\item The pretrained ResNet-50 is the exception on specificity: lesion-white
+\emph{lowers} specificity from $0.766$ to $0.622$. \todo{Hypothesis to test:
+ImageNet features already encode skin-like backgrounds well, so removing
+context hurts more than it helps for this backbone. Check by measuring
+penultimate-layer feature similarity between HAM and PAD with/without
+lesion-white.}
+\item The ViT is anomalous in both tables --- its $\sim 0.78$ PAD sensitivity
+with $\sim 0.48$ specificity indicates it is predicting ``malignant'' for most
+inputs, an artifact of the from-scratch training regime on a small dataset.
+\todo{Decide whether to keep ViT in the headline tables or move to an
+appendix.}
+\item A mean-probability ensemble of all four classifiers is competitive with
+the best single model on full images but loses to the pretrained ResNet-50
+under lesion-white.
+\end{itemize}
+
+\paragraph{Reading PAD-trained ResNet (oracle row).}
+For context we trained one model directly on PAD-UFES-20 and evaluated it on
+PAD's own held-out test split ($n=317$). It reaches $0.898$ sensitivity and
+$0.611$ specificity, with a wide specificity CI because the malignant class
+dominates PAD's test split. This is a loose upper bound on what a cross-domain
+HAM model could be expected to achieve.
+
+\subsection{Robustness to image corruptions}
+\todo{Designed in proposal but not yet run. Plan: apply Gaussian blur ($\sigma
+\in \{0.5,1.0,2.0\}$), Gaussian noise ($\sigma \in \{0.02,0.05,0.10\}$), and
+brightness shifts ($\pm \{0.1,0.2,0.3\}$) to the HAM10000 test set, score each
+model on the corrupted set without retraining, and plot sensitivity and
+specificity vs.\ corruption severity for full-image vs.\ lesion-white inputs.
+Hypothesis: lesion-white inputs degrade more gracefully because corruption of
+the (white) background contributes nothing to the prediction. Figure
+placeholder: 2$\times$3 grid (corruption type $\times$ metric).}
+
+\subsection{Error analysis}
+\todo{Per-diagnosis confusion breakdown on HAM test, and a side-by-side panel
+of cases where the lesion-white pipeline flips the prediction relative to
+full-image (in both directions), stratified by predicted segmenter Dice on a
+held-out ISIC-style validation. Looking specifically at: (i) does
+lesion-white help on borderline mel/nv pairs? (ii) does it hurt when the
+segmenter cuts off lesion edges?}
+
+\subsection{Discussion and takeaways}
+The matched-conditions comparison points to a nuanced answer. In-distribution
+on HAM10000, lesion-focusing raises sensitivity but does not substantially
+improve the operating-point specificity at $\geq 0.90$ sensitivity; the
+networks were apparently already extracting most of the relevant signal from
+the lesion itself. Under distribution shift to PAD-UFES-20, however,
+lesion-focusing benefits the non-pretrained networks on \emph{both}
+sensitivity and specificity, which is consistent with the shortcut-learning
+hypothesis: when the background distribution moves, a classifier that never
+saw background pixels has less to be confused by. The pretrained ResNet-50
+is the partial exception, and we suspect its ImageNet prior partially
+substitutes for the explicit context that lesion-focusing removes
+(\todo{quantify}). The ViT trained from scratch on $\sim 10$k images is
+underpowered and behaves as a near-constant ``malignant'' predictor under
+shift; this is a known regime in which ViTs underperform CNNs without
+either pretraining or heavy regularization.
+
+% ============================================================================
+\section{References}
+\label{sec:refs}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+% ============================================================================
+\appendix
+\section*{Reproducibility}
+The code is at \url{TODO/github-link}. \verb|submit/submit_full_pipeline.sh|
+chains data preparation, segmenter training, lesion-white image creation,
+classifier training, cross-domain evaluation, and the bootstrap analysis as a
+single SLURM job graph. \verb|src/training/ham10000_training.py| is the shared
+trainer used by all four backbones; the per-config wrappers in
+\verb|src/training/train_*.py| are 4-line shims. All experiments use seed 42.
+W\&B logs: \todo{insert link or report ID}.
+
+\section*{Team contributions}
+\begin{itemize}
+\item \textbf{Tobias Roemer.} Full-image baselines on HAM10000. Performance
+evaluation framework. \todo{adjust to actual final split}
+\item \textbf{Thomas Lee.} Lesion-white pipeline (segmenter $\to$ composite
+$\to$ classifier). Cross-domain evaluation on PAD-UFES-20.
+\item \textbf{Leo Li.} ISIC segmenter training. Robustness-under-corruption
+experiment.
+\end{itemize}
+
+\end{document}
