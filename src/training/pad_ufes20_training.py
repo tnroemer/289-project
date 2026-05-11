@@ -41,6 +41,7 @@ RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
+METRICS_DIR = os.path.join(RUN_DIR, "metrics")
 
 image_size = 224
 learning_rate = 3e-4
@@ -187,12 +188,13 @@ def train_pad_ufes20_full_image_resnet():
 
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(PRED_DIR, exist_ok=True)
+    os.makedirs(METRICS_DIR, exist_ok=True)
 
     best_model_path = os.path.join(CHECKPOINT_DIR, f"{model_name}_best.pt")
     predictions_path = os.path.join(PRED_DIR, f"{model_name}_test_predictions.csv")
-    metrics_path = os.path.join(PRED_DIR, f"{model_name}_test_metrics.csv")
+    metrics_path = os.path.join(METRICS_DIR, f"{model_name}_test_metrics.csv")
 
-    best_val_operating_specificity = -1.0
+    best_val_specificity = -1.0
     patience = 20
     epochs_without_improvement = 0
 
@@ -214,7 +216,7 @@ def train_pad_ufes20_full_image_resnet():
         )
         val_logits, val_targets = collect_logits(model, val_loader, device)
         val_scores = scores_from_logits(val_logits)
-        val_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+        val_threshold, val_threshold_metrics = choose_threshold_for_sensitivity(
             val_targets,
             val_scores.tolist(),
             BINARY_LABELS,
@@ -223,25 +225,20 @@ def train_pad_ufes20_full_image_resnet():
         )
 
         log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
-        log_row.update(wandb_metrics("train", train_metrics))
-        log_row.update(wandb_metrics("val", val_metrics))
+        log_row["train/loss"] = train_metrics["loss"]
+        log_row["val/loss"] = val_metrics["loss"]
         log_row.update({
-            f"val_operating/{name}": value
-            for name, value in val_operating_metrics.items()
+            f"val/{name}": value
+            for name, value in val_threshold_metrics.items()
             if isinstance(value, (int, float))
         })
         wandb.log(log_row)
 
-        print_epoch(epoch, train_metrics, val_metrics)
-        print(
-            f"Val Operating Threshold: {val_threshold:.4f} | "
-            f"Val Operating Malig Recall: {val_operating_metrics['malignant_recall']:.4f} | "
-            f"Val Operating Malig Specificity: {val_operating_metrics['malignant_specificity']:.4f}"
-        )
+        print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics)
 
-        val_selection_score = val_operating_metrics["malignant_specificity"]
-        if val_selection_score > best_val_operating_specificity:
-            best_val_operating_specificity = val_selection_score
+        val_specificity = val_threshold_metrics["specificity"]
+        if val_specificity > best_val_specificity:
+            best_val_specificity = val_specificity
             epochs_without_improvement = 0
 
             checkpoint = {
@@ -254,53 +251,32 @@ def train_pad_ufes20_full_image_resnet():
                 "pos_weight": pos_weight,
                 "malignant_threshold": val_threshold,
                 "target_sensitivity": TARGET_SENSITIVITY,
-                "val_operating_metrics": val_operating_metrics,
-                "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
-                "selection_score": val_selection_score,
+                "val_metrics": val_threshold_metrics,
+                "selection_metric": "val_specificity_at_target_sensitivity",
                 "val_loss": val_metrics["loss"],
-                "val_accuracy": val_metrics["accuracy"],
-                "val_macro_precision": val_metrics["macro_precision"],
-                "val_macro_recall": val_metrics["macro_recall"],
-                "val_macro_f1": val_metrics["macro_f1"],
-                "val_balanced_accuracy": val_metrics["balanced_accuracy"],
-                "val_binary_accuracy": val_metrics["binary_accuracy"],
-                "val_binary_macro_f1": val_metrics["binary_macro_f1"],
-                "val_binary_balanced_accuracy": val_metrics["binary_balanced_accuracy"],
-                "val_malignant_precision": val_metrics["malignant_precision"],
-                "val_malignant_recall": val_metrics["malignant_recall"],
-                "val_malignant_specificity": val_metrics["malignant_specificity"],
-                "val_malignant_f1": val_metrics["malignant_f1"],
-                "val_benign_recall": val_metrics["benign_recall"],
                 "config": {
                     **config,
                     "malignant_threshold": val_threshold,
-                    "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
-                    "selection_score": val_selection_score,
+                    "selection_metric": "val_specificity_at_target_sensitivity",
                 },
             }
 
             torch.save(checkpoint, best_model_path)
 
             wandb.run.summary["best_epoch"] = epoch
-            wandb.run.summary["best_val_operating_threshold"] = val_threshold
-            wandb.run.summary["best_val_operating_malignant_recall"] = val_operating_metrics["malignant_recall"]
-            wandb.run.summary["best_val_operating_malignant_specificity"] = val_operating_metrics["malignant_specificity"]
-            wandb.run.summary["best_val_selection_score"] = val_selection_score
-            wandb.run.summary["best_val_macro_f1"] = val_metrics["macro_f1"]
-            wandb.run.summary["best_val_accuracy"] = val_metrics["accuracy"]
-            wandb.run.summary["best_val_balanced_accuracy"] = val_metrics["balanced_accuracy"]
-            wandb.run.summary["best_val_binary_accuracy"] = val_metrics["binary_accuracy"]
-            wandb.run.summary["best_val_binary_macro_f1"] = val_metrics["binary_macro_f1"]
-            wandb.run.summary["best_val_binary_balanced_accuracy"] = val_metrics["binary_balanced_accuracy"]
-            wandb.run.summary["best_val_malignant_recall"] = val_metrics["malignant_recall"]
-            wandb.run.summary["best_val_malignant_specificity"] = val_metrics["malignant_specificity"]
-            wandb.run.summary["best_val_benign_recall"] = val_metrics["benign_recall"]
+            wandb.run.summary["best_val_threshold"] = val_threshold
+            wandb.run.summary["best_val_sensitivity"] = val_threshold_metrics["sensitivity"]
+            wandb.run.summary["best_val_specificity"] = val_threshold_metrics["specificity"]
+            wandb.run.summary["best_val_accuracy"] = val_threshold_metrics["accuracy"]
+            wandb.run.summary["best_val_precision"] = val_threshold_metrics["precision"]
+            wandb.run.summary["best_val_f1"] = val_threshold_metrics["f1"]
+            wandb.run.summary["best_val_balanced_accuracy"] = val_threshold_metrics["balanced_accuracy"]
 
             wandb.save(best_model_path)
 
             print(
                 "Saved new best model: "
-                f"val_operating_malignant_specificity={val_selection_score:.4f}"
+                f"val_specificity={val_specificity:.4f}"
             )
         else:
             epochs_without_improvement += 1
@@ -316,7 +292,7 @@ def train_pad_ufes20_full_image_resnet():
 
     val_logits, val_targets = collect_logits(model, val_loader, device)
     val_scores = scores_from_logits(val_logits)
-    malignant_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+    malignant_threshold, val_threshold_metrics = choose_threshold_for_sensitivity(
         val_targets,
         val_scores.tolist(),
         BINARY_LABELS,
@@ -326,20 +302,20 @@ def train_pad_ufes20_full_image_resnet():
 
     checkpoint["malignant_threshold"] = malignant_threshold
     checkpoint["target_sensitivity"] = TARGET_SENSITIVITY
-    checkpoint["val_operating_metrics"] = val_operating_metrics
+    checkpoint["val_metrics"] = val_threshold_metrics
     checkpoint["config"]["malignant_threshold"] = malignant_threshold
     torch.save(checkpoint, best_model_path)
 
-    print(f"Validation operating threshold: {malignant_threshold:.4f}")
-    print(f"Validation operating malignant recall: {val_operating_metrics['malignant_recall']:.4f}")
-    print(f"Validation operating malignant specificity: {val_operating_metrics['malignant_specificity']:.4f}")
+    print(f"Validation threshold: {malignant_threshold:.4f}")
+    print(f"Validation sensitivity: {val_threshold_metrics['sensitivity']:.4f}")
+    print(f"Validation specificity: {val_threshold_metrics['specificity']:.4f}")
 
-    val_operating_log = {
-        f"val_operating/{name}": value
-        for name, value in val_operating_metrics.items()
+    val_log = {
+        f"val/{name}": value
+        for name, value in val_threshold_metrics.items()
         if isinstance(value, (int, float))
     }
-    wandb.log(val_operating_log)
+    wandb.log(val_log)
 
     test_metrics = save_predictions(
         model,
@@ -355,16 +331,11 @@ def train_pad_ufes20_full_image_resnet():
     wandb.log(wandb_metrics("test", test_metrics))
     wandb.run.summary["test_loss"] = test_metrics["loss"]
     wandb.run.summary["test_accuracy"] = test_metrics["accuracy"]
-    wandb.run.summary["test_macro_f1"] = test_metrics["macro_f1"]
+    wandb.run.summary["test_precision"] = test_metrics["precision"]
+    wandb.run.summary["test_sensitivity"] = test_metrics["sensitivity"]
+    wandb.run.summary["test_specificity"] = test_metrics["specificity"]
+    wandb.run.summary["test_f1"] = test_metrics["f1"]
     wandb.run.summary["test_balanced_accuracy"] = test_metrics["balanced_accuracy"]
-    wandb.run.summary["test_binary_accuracy"] = test_metrics["binary_accuracy"]
-    wandb.run.summary["test_binary_macro_f1"] = test_metrics["binary_macro_f1"]
-    wandb.run.summary["test_binary_balanced_accuracy"] = test_metrics["binary_balanced_accuracy"]
-    wandb.run.summary["test_malignant_recall"] = test_metrics["malignant_recall"]
-    wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
-    wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
-    wandb.run.summary["operating_threshold"] = malignant_threshold
-    wandb.run.summary["test_operating_malignant_recall"] = test_metrics["operating_malignant_recall"]
-    wandb.run.summary["test_operating_malignant_specificity"] = test_metrics["operating_malignant_specificity"]
+    wandb.run.summary["threshold"] = malignant_threshold
 
     wandb.finish()

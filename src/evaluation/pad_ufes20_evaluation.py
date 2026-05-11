@@ -4,6 +4,7 @@ import pandas as pd
 import torch
 
 from PIL import Image
+from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
@@ -13,9 +14,8 @@ from training.ham10000_training import (
     MALIGNANT_LABELS,
     OVERLAP_LABELS,
     TARGET_SENSITIVITY,
-    binary_metrics_from_scores,
     choose_threshold_for_sensitivity,
-    operating_metrics_to_rows,
+    metrics_to_rows,
     scores_from_logits,
 )
 from models.model_architectures import build_model
@@ -25,6 +25,7 @@ DATA_ROOT = "/ocean/projects/mth250011p/troemer"
 RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 MODEL_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
+METRICS_DIR = os.path.join(RUN_DIR, "metrics")
 SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 PAD_IMAGE_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
 PAD_IMAGE_METADATA_PATH = os.path.join(PAD_IMAGE_DIR, "metadata.csv")
@@ -82,43 +83,7 @@ def make_transform(image_size):
 
 
 def compute_metrics(targets, preds, labels):
-    num_classes = len(labels)
     total = len(targets)
-    correct = sum(int(t == p) for t, p in zip(targets, preds))
-
-    rows = [
-        {"metric": "accuracy", "class": "overall", "value": correct / total if total > 0 else 0.0},
-        {"metric": "num_examples", "class": "overall", "value": total},
-    ]
-
-    recalls = []
-    precisions = []
-    f1s = []
-
-    for class_index, label in enumerate(labels):
-        true_positive = sum(int(t == class_index and p == class_index) for t, p in zip(targets, preds))
-        false_positive = sum(int(t != class_index and p == class_index) for t, p in zip(targets, preds))
-        false_negative = sum(int(t == class_index and p != class_index) for t, p in zip(targets, preds))
-        true_negative = sum(int(t != class_index and p != class_index) for t, p in zip(targets, preds))
-        support = sum(int(t == class_index) for t in targets)
-
-        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-        specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
-
-        precisions.append(precision)
-        recalls.append(recall)
-        f1s.append(f1)
-
-        rows.extend([
-            {"metric": "support", "class": label, "value": support},
-            {"metric": "precision", "class": label, "value": precision},
-            {"metric": "recall", "class": label, "value": recall},
-            {"metric": "specificity", "class": label, "value": specificity},
-            {"metric": "f1", "class": label, "value": f1},
-        ])
-
     malignant_indices = [i for i, label in enumerate(labels) if label in MALIGNANT_LABELS]
     true_malignant = [t in malignant_indices for t in targets]
     pred_malignant = [p in malignant_indices for p in preds]
@@ -128,65 +93,28 @@ def compute_metrics(targets, preds, labels):
     false_negative = sum(int(t and (not p)) for t, p in zip(true_malignant, pred_malignant))
     true_negative = sum(int((not t) and (not p)) for t, p in zip(true_malignant, pred_malignant))
 
-    binary_accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
-    malignant_precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-    malignant_recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    malignant_specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    malignant_f1 = (
-        2 * malignant_precision * malignant_recall / (malignant_precision + malignant_recall)
-        if malignant_precision + malignant_recall > 0
-        else 0.0
-    )
-    benign_precision = true_negative / (true_negative + false_negative) if true_negative + false_negative > 0 else 0.0
-    benign_recall = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    benign_specificity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    benign_f1 = (
-        2 * benign_precision * benign_recall / (benign_precision + benign_recall)
-        if benign_precision + benign_recall > 0
-        else 0.0
-    )
-    binary_macro_precision = (malignant_precision + benign_precision) / 2
-    binary_macro_recall = (malignant_recall + benign_recall) / 2
-    binary_macro_f1 = (malignant_f1 + benign_f1) / 2
+    accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    sensitivity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    f1 = 2 * precision * sensitivity / (precision + sensitivity) if precision + sensitivity > 0 else 0.0
+    balanced_accuracy = (sensitivity + specificity) / 2
 
-    rows.extend([
-        {"metric": "macro_precision", "class": "overall", "value": sum(precisions) / num_classes},
-        {"metric": "macro_recall", "class": "overall", "value": sum(recalls) / num_classes},
-        {"metric": "macro_f1", "class": "overall", "value": sum(f1s) / num_classes},
-        {"metric": "balanced_accuracy", "class": "overall", "value": sum(recalls) / num_classes},
-        {"metric": "binary_accuracy", "class": "overall", "value": binary_accuracy},
-        {"metric": "binary_macro_precision", "class": "overall", "value": binary_macro_precision},
-        {"metric": "binary_macro_recall", "class": "overall", "value": binary_macro_recall},
-        {"metric": "binary_macro_f1", "class": "overall", "value": binary_macro_f1},
-        {"metric": "binary_balanced_accuracy", "class": "overall", "value": binary_macro_recall},
-        {"metric": "sensitivity", "class": "malignant", "value": malignant_recall},
-        {"metric": "specificity", "class": "benign", "value": malignant_specificity},
-        {"metric": "malignant_precision", "class": "malignant", "value": malignant_precision},
-        {"metric": "malignant_recall", "class": "malignant", "value": malignant_recall},
-        {"metric": "malignant_specificity", "class": "benign", "value": malignant_specificity},
-        {"metric": "malignant_f1", "class": "malignant", "value": malignant_f1},
-        {"metric": "benign_precision", "class": "benign", "value": benign_precision},
-        {"metric": "benign_recall", "class": "benign", "value": benign_recall},
-        {"metric": "benign_specificity", "class": "malignant", "value": benign_specificity},
-        {"metric": "benign_f1", "class": "benign", "value": benign_f1},
-        {"metric": "binary_true_positive", "class": "malignant", "value": true_positive},
-        {"metric": "binary_false_positive", "class": "malignant", "value": false_positive},
-        {"metric": "binary_false_negative", "class": "malignant", "value": false_negative},
-        {"metric": "binary_true_negative", "class": "benign", "value": true_negative},
-        {"metric": "support", "class": "malignant", "value": true_positive + false_negative},
-        {"metric": "support", "class": "benign", "value": true_negative + false_positive},
-    ])
-
-    for true_index, true_label in enumerate(labels):
-        for pred_index, pred_label in enumerate(labels):
-            count = sum(int(t == true_index and p == pred_index) for t, p in zip(targets, preds))
-            rows.append({
-                "metric": f"confusion_{true_label}_pred_{pred_label}",
-                "class": "overall",
-                "value": count,
-            })
-
-    return pd.DataFrame(rows)
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "sensitivity": sensitivity,
+        "specificity": specificity,
+        "f1": f1,
+        "balanced_accuracy": balanced_accuracy,
+        "true_positive": true_positive,
+        "false_positive": false_positive,
+        "false_negative": false_negative,
+        "true_negative": true_negative,
+        "malignant_support": true_positive + false_negative,
+        "benign_support": true_negative + false_positive,
+        "num_examples": total,
+    }
 
 
 def model_specs(image_source):
@@ -364,20 +292,14 @@ def predict_model(model_spec, df, device):
 
             logits = model(images).view(-1)
             malignant_scores = scores_from_logits(logits)
-            preds = (malignant_scores >= 0.5).long()
 
             targets.extend(labels_batch.cpu().tolist())
             scores_all.append(malignant_scores.cpu())
 
-            preds_cpu = preds.cpu()
             labels_cpu = labels_batch.cpu()
-            malignant_scores_cpu = malignant_scores.cpu()
 
             for i in range(images.size(0)):
-                pred_index = int(preds_cpu[i])
                 true_index = int(labels_cpu[i])
-                malignant_score = float(malignant_scores_cpu[i])
-                pred_binary_threshold = "malignant" if malignant_score >= malignant_threshold else "benign"
 
                 row = {
                     "img_id": batch["img_id"][i],
@@ -385,19 +307,8 @@ def predict_model(model_spec, df, device):
                     "diagnostic": batch["diagnostic"][i],
                     "true_label": true_index,
                     "true_dx": batch["dx"][i],
-                    "pred_label": pred_index,
-                    "pred_dx": labels[pred_index],
-                    "correct": int(pred_index == true_index),
-                    "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
-                    "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
-                    "malignant_score": malignant_score,
-                    "prob_benign": 1.0 - malignant_score,
-                    "prob_malignant": malignant_score,
-                    "operating_threshold": malignant_threshold,
-                    "pred_binary_threshold": pred_binary_threshold,
+                    "true_class": batch["binary_class"][i],
                 }
-                row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
-                row["binary_threshold_correct"] = int(row["true_binary"] == row["pred_binary_threshold"])
 
                 rows.append(row)
 
@@ -432,55 +343,48 @@ def save_model_predictions(
         threshold_preds.append(pred_index)
 
         output_row["default_label"] = default_index
-        output_row["default_dx"] = labels[default_index]
+        output_row["default_class"] = labels[default_index]
         output_row["default_correct"] = int(default_index == output_row["true_label"])
         output_row["pred_label"] = pred_index
-        output_row["pred_dx"] = pred_class
+        output_row["pred_class"] = pred_class
         output_row["correct"] = int(pred_index == output_row["true_label"])
-        output_row["pred_binary"] = pred_class
-        output_row["binary_correct"] = output_row["correct"]
         output_row["malignant_score"] = malignant_score
         output_row["prob_benign"] = 1.0 - malignant_score
         output_row["prob_malignant"] = malignant_score
-        output_row["operating_threshold"] = malignant_threshold
-        output_row["pred_binary_threshold"] = pred_class
-        output_row["binary_threshold_correct"] = output_row["correct"]
+        output_row["threshold"] = malignant_threshold
 
         output_rows.append(output_row)
 
     targets = [row["true_label"] for row in output_rows]
-    metrics_df = compute_metrics(targets, threshold_preds, labels)
-    operating_metrics = binary_metrics_from_scores(
-        targets,
-        scores.tolist(),
-        labels,
-        MALIGNANT_LABELS,
-        malignant_threshold,
-    )
-    metrics_df = pd.concat([
-        metrics_df,
-        pd.DataFrame(operating_metrics_to_rows(operating_metrics)),
-    ], ignore_index=True)
+    metrics = compute_metrics(targets, threshold_preds, labels)
+    target_tensor = torch.tensor(targets, dtype=torch.float32)
+    metrics["loss"] = nn.functional.binary_cross_entropy(
+        scores.clamp(1e-7, 1.0 - 1e-7),
+        target_tensor,
+    ).item()
+    metrics["threshold"] = malignant_threshold
+    metrics["target_sensitivity"] = TARGET_SENSITIVITY
 
     os.makedirs(PRED_DIR, exist_ok=True)
+    os.makedirs(METRICS_DIR, exist_ok=True)
     predictions_path = os.path.join(
         PRED_DIR,
         f"pad_ufes_20_{source_name}_{model_name}_predictions.csv",
     )
     metrics_path = os.path.join(
-        PRED_DIR,
+        METRICS_DIR,
         f"pad_ufes_20_{source_name}_{model_name}_metrics.csv",
     )
 
     pd.DataFrame(output_rows).to_csv(predictions_path, index=False)
-    metrics_df.to_csv(metrics_path, index=False)
+    pd.DataFrame(metrics_to_rows(metrics)).to_csv(metrics_path, index=False)
 
     print(
-        f"{model_name} sensitivity: {operating_metrics['malignant_recall']:.4f} | "
-        f"specificity: {operating_metrics['malignant_specificity']:.4f} | "
+        f"{model_name} sensitivity: {metrics['sensitivity']:.4f} | "
+        f"specificity: {metrics['specificity']:.4f} | "
         f"threshold: {malignant_threshold:.4f}"
     )
-    if operating_metrics["malignant_recall"] < TARGET_SENSITIVITY:
+    if metrics["sensitivity"] < TARGET_SENSITIVITY:
         print(
             f"WARNING: {model_name} sensitivity is below target "
             f"{TARGET_SENSITIVITY:.2f} on PAD-UFES-20 {source_name}."
@@ -540,8 +444,8 @@ def choose_ensemble_threshold(model_specs_for_source, image_source, device):
     )
 
     print(
-        f"Ensemble HAM validation sensitivity: {metrics['malignant_recall']:.4f} | "
-        f"specificity: {metrics['malignant_specificity']:.4f} | "
+        f"Ensemble HAM validation sensitivity: {metrics['sensitivity']:.4f} | "
+        f"specificity: {metrics['specificity']:.4f} | "
         f"threshold: {threshold:.4f}"
     )
 

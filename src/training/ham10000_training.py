@@ -19,6 +19,7 @@ RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
 SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")
+METRICS_DIR = os.path.join(RUN_DIR, "metrics")
 
 OVERLAP_LABELS = ["akiec", "bcc", "bkl", "mel", "nv"]
 BINARY_LABELS = ["benign", "malignant"]
@@ -104,6 +105,7 @@ class SkinLesionDataset(Dataset):
             "image_id": row["image_id"],
             "image_path": row["image_path"],
             "dx": row["dx"],
+            "binary_class": row["binary_class"],
         }
 
 
@@ -129,45 +131,29 @@ def binary_metrics_from_scores(targets, scores, labels, malignant_labels, thresh
     false_negative = sum(int(t and (not p)) for t, p in zip(true_malignant, pred_malignant))
     true_negative = sum(int((not t) and (not p)) for t, p in zip(true_malignant, pred_malignant))
 
-    malignant_precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-    malignant_recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    malignant_specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    malignant_f1 = (
-        2 * malignant_precision * malignant_recall / (malignant_precision + malignant_recall)
-        if malignant_precision + malignant_recall > 0
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    sensitivity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    f1 = (
+        2 * precision * sensitivity / (precision + sensitivity)
+        if precision + sensitivity > 0
         else 0.0
     )
-    benign_precision = true_negative / (true_negative + false_negative) if true_negative + false_negative > 0 else 0.0
-    benign_recall = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    benign_specificity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    benign_f1 = (
-        2 * benign_precision * benign_recall / (benign_precision + benign_recall)
-        if benign_precision + benign_recall > 0
-        else 0.0
-    )
+    balanced_accuracy = (sensitivity + specificity) / 2
 
     return {
         "threshold": threshold,
         "target_sensitivity": TARGET_SENSITIVITY,
-        "binary_accuracy": (true_positive + true_negative) / total if total > 0 else 0.0,
-        "binary_macro_precision": (malignant_precision + benign_precision) / 2,
-        "binary_macro_recall": (malignant_recall + benign_recall) / 2,
-        "binary_macro_f1": (malignant_f1 + benign_f1) / 2,
-        "binary_balanced_accuracy": (malignant_recall + benign_recall) / 2,
-        "sensitivity": malignant_recall,
-        "specificity": malignant_specificity,
-        "malignant_precision": malignant_precision,
-        "malignant_recall": malignant_recall,
-        "malignant_specificity": malignant_specificity,
-        "malignant_f1": malignant_f1,
-        "benign_precision": benign_precision,
-        "benign_recall": benign_recall,
-        "benign_specificity": benign_specificity,
-        "benign_f1": benign_f1,
-        "binary_true_positive": true_positive,
-        "binary_false_positive": false_positive,
-        "binary_false_negative": false_negative,
-        "binary_true_negative": true_negative,
+        "accuracy": (true_positive + true_negative) / total if total > 0 else 0.0,
+        "precision": precision,
+        "sensitivity": sensitivity,
+        "specificity": specificity,
+        "f1": f1,
+        "balanced_accuracy": balanced_accuracy,
+        "true_positive": true_positive,
+        "false_positive": false_positive,
+        "false_negative": false_negative,
+        "true_negative": true_negative,
         "malignant_support": true_positive + false_negative,
         "benign_support": true_negative + false_positive,
         "num_examples": total,
@@ -184,8 +170,8 @@ def choose_threshold_for_sensitivity(targets, scores, labels, malignant_labels, 
     for threshold in candidate_thresholds:
         metrics = binary_metrics_from_scores(targets, scores, labels, malignant_labels, threshold)
         metrics["target_sensitivity"] = target_sensitivity
-        if metrics["malignant_recall"] >= target_sensitivity:
-            if best_metrics is None or metrics["malignant_specificity"] > best_metrics["malignant_specificity"]:
+        if metrics["sensitivity"] >= target_sensitivity:
+            if best_metrics is None or metrics["specificity"] > best_metrics["specificity"]:
                 best_metrics = metrics
 
     if best_metrics is None:
@@ -195,17 +181,31 @@ def choose_threshold_for_sensitivity(targets, scores, labels, malignant_labels, 
     return best_metrics["threshold"], best_metrics
 
 
-def operating_metrics_to_rows(metrics):
-    rows = []
+def metrics_to_rows(metrics):
+    metric_names = [
+        "loss",
+        "threshold",
+        "target_sensitivity",
+        "accuracy",
+        "precision",
+        "sensitivity",
+        "specificity",
+        "f1",
+        "balanced_accuracy",
+        "true_positive",
+        "false_positive",
+        "false_negative",
+        "true_negative",
+        "malignant_support",
+        "benign_support",
+        "num_examples",
+    ]
 
-    for name, value in metrics.items():
-        rows.append({
-            "metric": f"operating_{name}",
-            "class": "operating_point",
-            "value": value,
-        })
-
-    return rows
+    return [
+        {"metric": name, "value": metrics[name]}
+        for name in metric_names
+        if name in metrics
+    ]
 
 
 def make_transforms(image_size):
@@ -327,43 +327,7 @@ def prepare_datasets(image_source, image_size):
 
 
 def compute_metrics(targets, preds, labels):
-    num_classes = len(labels)
     total = len(targets)
-    correct = sum(int(t == p) for t, p in zip(targets, preds))
-
-    per_class = {}
-    recalls = []
-    precisions = []
-    f1s = []
-
-    for class_index, label in enumerate(labels):
-        true_positive = sum(int(t == class_index and p == class_index) for t, p in zip(targets, preds))
-        false_positive = sum(int(t != class_index and p == class_index) for t, p in zip(targets, preds))
-        false_negative = sum(int(t == class_index and p != class_index) for t, p in zip(targets, preds))
-        true_negative = sum(int(t != class_index and p != class_index) for t, p in zip(targets, preds))
-        support = sum(int(t == class_index) for t in targets)
-
-        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-        specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
-
-        per_class[label] = {
-            "support": support,
-            "precision": precision,
-            "recall": recall,
-            "specificity": specificity,
-            "f1": f1,
-            "true_positive": true_positive,
-            "false_positive": false_positive,
-            "false_negative": false_negative,
-            "true_negative": true_negative,
-        }
-
-        precisions.append(precision)
-        recalls.append(recall)
-        f1s.append(f1)
-
     malignant_indices = [i for i, label in enumerate(labels) if label in MALIGNANT_LABELS]
     true_malignant = [t in malignant_indices for t in targets]
     pred_malignant = [p in malignant_indices for p in preds]
@@ -373,63 +337,31 @@ def compute_metrics(targets, preds, labels):
     false_negative = sum(int(t and (not p)) for t, p in zip(true_malignant, pred_malignant))
     true_negative = sum(int((not t) and (not p)) for t, p in zip(true_malignant, pred_malignant))
 
-    binary_accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
-    malignant_precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
-    malignant_recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    malignant_specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    malignant_f1 = (
-        2 * malignant_precision * malignant_recall / (malignant_precision + malignant_recall)
-        if malignant_precision + malignant_recall > 0
+    accuracy = (true_positive + true_negative) / total if total > 0 else 0.0
+    precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0.0
+    sensitivity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
+    specificity = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
+    f1 = (
+        2 * precision * sensitivity / (precision + sensitivity)
+        if precision + sensitivity > 0
         else 0.0
     )
-    benign_precision = true_negative / (true_negative + false_negative) if true_negative + false_negative > 0 else 0.0
-    benign_recall = true_negative / (true_negative + false_positive) if true_negative + false_positive > 0 else 0.0
-    benign_specificity = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0.0
-    benign_f1 = (
-        2 * benign_precision * benign_recall / (benign_precision + benign_recall)
-        if benign_precision + benign_recall > 0
-        else 0.0
-    )
-    binary_macro_precision = (malignant_precision + benign_precision) / 2
-    binary_macro_recall = (malignant_recall + benign_recall) / 2
-    binary_macro_f1 = (malignant_f1 + benign_f1) / 2
-
-    confusion = {}
-    for true_index, true_label in enumerate(labels):
-        for pred_index, pred_label in enumerate(labels):
-            confusion[f"{true_label}_pred_{pred_label}"] = sum(
-                int(t == true_index and p == pred_index)
-                for t, p in zip(targets, preds)
-            )
+    balanced_accuracy = (sensitivity + specificity) / 2
 
     return {
-        "accuracy": correct / total if total > 0 else 0.0,
-        "macro_precision": sum(precisions) / num_classes,
-        "macro_recall": sum(recalls) / num_classes,
-        "macro_f1": sum(f1s) / num_classes,
-        "balanced_accuracy": sum(recalls) / num_classes,
-        "binary_accuracy": binary_accuracy,
-        "binary_macro_precision": binary_macro_precision,
-        "binary_macro_recall": binary_macro_recall,
-        "binary_macro_f1": binary_macro_f1,
-        "binary_balanced_accuracy": binary_macro_recall,
-        "malignant_precision": malignant_precision,
-        "malignant_recall": malignant_recall,
-        "malignant_specificity": malignant_specificity,
-        "malignant_f1": malignant_f1,
-        "benign_precision": benign_precision,
-        "benign_recall": benign_recall,
-        "benign_specificity": benign_specificity,
-        "benign_f1": benign_f1,
-        "binary_true_positive": true_positive,
-        "binary_false_positive": false_positive,
-        "binary_false_negative": false_negative,
-        "binary_true_negative": true_negative,
+        "accuracy": accuracy,
+        "precision": precision,
+        "sensitivity": sensitivity,
+        "specificity": specificity,
+        "f1": f1,
+        "balanced_accuracy": balanced_accuracy,
+        "true_positive": true_positive,
+        "false_positive": false_positive,
+        "false_negative": false_negative,
+        "true_negative": true_negative,
         "malignant_support": true_positive + false_negative,
         "benign_support": true_negative + false_positive,
         "num_examples": total,
-        "per_class": per_class,
-        "confusion": confusion,
     }
 
 
@@ -517,48 +449,8 @@ def collect_logits(model, loader, device):
     return torch.cat(logits, dim=0), targets
 
 
-def write_metrics_csv(metrics, labels, metrics_path, operating_metrics=None):
-    rows = [
-        {"metric": "loss", "class": "overall", "value": metrics["loss"]},
-        {"metric": "accuracy", "class": "overall", "value": metrics["accuracy"]},
-        {"metric": "macro_precision", "class": "overall", "value": metrics["macro_precision"]},
-        {"metric": "macro_recall", "class": "overall", "value": metrics["macro_recall"]},
-        {"metric": "macro_f1", "class": "overall", "value": metrics["macro_f1"]},
-        {"metric": "balanced_accuracy", "class": "overall", "value": metrics["balanced_accuracy"]},
-        {"metric": "binary_accuracy", "class": "overall", "value": metrics["binary_accuracy"]},
-        {"metric": "binary_macro_precision", "class": "overall", "value": metrics["binary_macro_precision"]},
-        {"metric": "binary_macro_recall", "class": "overall", "value": metrics["binary_macro_recall"]},
-        {"metric": "binary_macro_f1", "class": "overall", "value": metrics["binary_macro_f1"]},
-        {"metric": "binary_balanced_accuracy", "class": "overall", "value": metrics["binary_balanced_accuracy"]},
-        {"metric": "malignant_precision", "class": "malignant", "value": metrics["malignant_precision"]},
-        {"metric": "malignant_recall", "class": "malignant", "value": metrics["malignant_recall"]},
-        {"metric": "malignant_specificity", "class": "benign", "value": metrics["malignant_specificity"]},
-        {"metric": "malignant_f1", "class": "malignant", "value": metrics["malignant_f1"]},
-        {"metric": "benign_precision", "class": "benign", "value": metrics["benign_precision"]},
-        {"metric": "benign_recall", "class": "benign", "value": metrics["benign_recall"]},
-        {"metric": "benign_specificity", "class": "malignant", "value": metrics["benign_specificity"]},
-        {"metric": "benign_f1", "class": "benign", "value": metrics["benign_f1"]},
-        {"metric": "binary_true_positive", "class": "malignant", "value": metrics["binary_true_positive"]},
-        {"metric": "binary_false_positive", "class": "malignant", "value": metrics["binary_false_positive"]},
-        {"metric": "binary_false_negative", "class": "malignant", "value": metrics["binary_false_negative"]},
-        {"metric": "binary_true_negative", "class": "benign", "value": metrics["binary_true_negative"]},
-        {"metric": "support", "class": "malignant", "value": metrics["malignant_support"]},
-        {"metric": "support", "class": "benign", "value": metrics["benign_support"]},
-        {"metric": "num_examples", "class": "overall", "value": metrics["num_examples"]},
-    ]
-
-    for label in labels:
-        class_metrics = metrics["per_class"][label]
-        for metric_name, value in class_metrics.items():
-            rows.append({"metric": metric_name, "class": label, "value": value})
-
-    for name, value in metrics["confusion"].items():
-        rows.append({"metric": f"confusion_{name}", "class": "overall", "value": value})
-
-    if operating_metrics is not None:
-        rows.extend(operating_metrics_to_rows(operating_metrics["metrics"]))
-
-    pd.DataFrame(rows).to_csv(metrics_path, index=False)
+def write_metrics_csv(metrics, metrics_path):
+    pd.DataFrame(metrics_to_rows(metrics)).to_csv(metrics_path, index=False)
 
 
 def save_predictions(
@@ -577,7 +469,6 @@ def save_predictions(
     total = 0
     all_targets = []
     all_preds = []
-    all_malignant_scores = []
     rows = []
 
     with torch.no_grad():
@@ -598,7 +489,6 @@ def save_predictions(
             total += labels_batch.size(0)
             all_targets.extend(labels_batch.cpu().tolist())
             all_preds.extend(preds.cpu().tolist())
-            all_malignant_scores.extend(malignant_scores.cpu().tolist())
 
             default_preds_cpu = default_preds.cpu()
             preds_cpu = preds.cpu()
@@ -610,64 +500,46 @@ def save_predictions(
                 pred_index = int(preds_cpu[i])
                 true_index = int(labels_cpu[i])
                 malignant_score = float(malignant_scores_cpu[i])
-                threshold_pred_binary = labels[pred_index]
-                threshold_correct = int(true_index == pred_index)
 
                 row = {
                     "image_id": batch["image_id"][i],
                     "image_path": batch["image_path"][i],
                     "true_label": true_index,
                     "true_dx": batch["dx"][i],
+                    "true_class": batch["binary_class"][i],
                     "default_label": default_index,
-                    "default_dx": labels[default_index],
+                    "default_class": labels[default_index],
                     "default_correct": int(default_index == true_index),
                     "pred_label": pred_index,
-                    "pred_dx": labels[pred_index],
+                    "pred_class": labels[pred_index],
                     "correct": int(pred_index == true_index),
-                    "true_binary": "malignant" if labels[true_index] in MALIGNANT_LABELS else "benign",
-                    "pred_binary": "malignant" if labels[pred_index] in MALIGNANT_LABELS else "benign",
                     "malignant_score": malignant_score,
                     "prob_benign": 1.0 - malignant_score,
                     "prob_malignant": malignant_score,
-                    "operating_threshold": malignant_threshold,
-                    "pred_binary_threshold": threshold_pred_binary,
-                    "binary_threshold_correct": threshold_correct,
+                    "threshold": malignant_threshold,
                 }
-                row["binary_correct"] = int(row["true_binary"] == row["pred_binary"])
 
                 rows.append(row)
 
     metrics = compute_metrics(all_targets, all_preds, labels)
     metrics["loss"] = total_loss / total
-    operating_metrics = None
 
     if malignant_threshold is not None:
-        threshold_metrics = binary_metrics_from_scores(
-            all_targets,
-            all_malignant_scores,
-            labels,
-            MALIGNANT_LABELS,
-            malignant_threshold,
-        )
-        operating_metrics = {"metrics": threshold_metrics}
-        for name, value in threshold_metrics.items():
-            metrics[f"operating_{name}"] = value
+        metrics["threshold"] = malignant_threshold
+        metrics["target_sensitivity"] = TARGET_SENSITIVITY
 
     pd.DataFrame(rows).to_csv(predictions_path, index=False)
-    write_metrics_csv(metrics, labels, metrics_path, operating_metrics=operating_metrics)
+    write_metrics_csv(metrics, metrics_path)
 
     print(f"Test Loss: {metrics['loss']:.4f}")
     print(f"Test Accuracy: {metrics['accuracy']:.4f}")
-    print(f"Test Macro F1: {metrics['macro_f1']:.4f}")
+    print(f"Test Precision: {metrics['precision']:.4f}")
+    print(f"Test Sensitivity: {metrics['sensitivity']:.4f}")
+    print(f"Test Specificity: {metrics['specificity']:.4f}")
+    print(f"Test F1: {metrics['f1']:.4f}")
     print(f"Test Balanced Acc: {metrics['balanced_accuracy']:.4f}")
-    print(f"Test Binary Accuracy: {metrics['binary_accuracy']:.4f}")
-    print(f"Test Binary Macro F1: {metrics['binary_macro_f1']:.4f}")
-    print(f"Test Malignant Recall: {metrics['malignant_recall']:.4f}")
-    print(f"Test Malignant Specificity: {metrics['malignant_specificity']:.4f}")
     if malignant_threshold is not None:
-        print(f"Operating Threshold: {malignant_threshold:.4f}")
-        print(f"Operating Malignant Recall: {metrics['operating_malignant_recall']:.4f}")
-        print(f"Operating Malignant Specificity: {metrics['operating_malignant_specificity']:.4f}")
+        print(f"Threshold: {malignant_threshold:.4f}")
     print(f"Saved predictions to {predictions_path}")
     print(f"Saved metrics to {metrics_path}")
 
@@ -678,42 +550,24 @@ def wandb_metrics(prefix, metrics):
     rows = {
         f"{prefix}/loss": metrics["loss"],
         f"{prefix}/accuracy": metrics["accuracy"],
-        f"{prefix}/macro_precision": metrics["macro_precision"],
-        f"{prefix}/macro_recall": metrics["macro_recall"],
-        f"{prefix}/macro_f1": metrics["macro_f1"],
+        f"{prefix}/precision": metrics["precision"],
+        f"{prefix}/sensitivity": metrics["sensitivity"],
+        f"{prefix}/specificity": metrics["specificity"],
+        f"{prefix}/f1": metrics["f1"],
         f"{prefix}/balanced_accuracy": metrics["balanced_accuracy"],
-        f"{prefix}/binary_accuracy": metrics["binary_accuracy"],
-        f"{prefix}/binary_macro_precision": metrics["binary_macro_precision"],
-        f"{prefix}/binary_macro_recall": metrics["binary_macro_recall"],
-        f"{prefix}/binary_macro_f1": metrics["binary_macro_f1"],
-        f"{prefix}/binary_balanced_accuracy": metrics["binary_balanced_accuracy"],
-        f"{prefix}/malignant_precision": metrics["malignant_precision"],
-        f"{prefix}/malignant_recall": metrics["malignant_recall"],
-        f"{prefix}/malignant_specificity": metrics["malignant_specificity"],
-        f"{prefix}/malignant_f1": metrics["malignant_f1"],
-        f"{prefix}/benign_precision": metrics["benign_precision"],
-        f"{prefix}/benign_recall": metrics["benign_recall"],
-        f"{prefix}/benign_f1": metrics["benign_f1"],
     }
-
-    for name, value in metrics.items():
-        if name.startswith("operating_") and isinstance(value, (int, float)):
-            rows[f"{prefix}/{name}"] = value
 
     return rows
 
 
-def print_epoch(epoch, train_metrics, val_metrics):
+def print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics):
     print(
         f"Epoch {epoch}/{num_epochs} | "
         f"Train Loss: {train_metrics['loss']:.4f} | "
-        f"Train Acc: {train_metrics['accuracy']:.4f} | "
-        f"Train Macro F1: {train_metrics['macro_f1']:.4f} | "
-        f"Train Malig Recall: {train_metrics['malignant_recall']:.4f} | "
         f"Val Loss: {val_metrics['loss']:.4f} | "
-        f"Val Acc: {val_metrics['accuracy']:.4f} | "
-        f"Val Macro F1: {val_metrics['macro_f1']:.4f} | "
-        f"Val Malig Recall: {val_metrics['malignant_recall']:.4f}"
+        f"Val Threshold: {val_threshold:.4f} | "
+        f"Val Sens: {val_threshold_metrics['sensitivity']:.4f} | "
+        f"Val Spec: {val_threshold_metrics['specificity']:.4f}"
     )
 
 
@@ -851,12 +705,13 @@ def train_ham10000_model(model_type, image_source):
 
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(PRED_DIR, exist_ok=True)
+    os.makedirs(METRICS_DIR, exist_ok=True)
 
     best_model_path = os.path.join(CHECKPOINT_DIR, f"{model_name}_best.pt")
     predictions_path = os.path.join(PRED_DIR, f"{model_name}_test_predictions.csv")
-    metrics_path = os.path.join(PRED_DIR, f"{model_name}_test_metrics.csv")
+    metrics_path = os.path.join(METRICS_DIR, f"{model_name}_test_metrics.csv")
 
-    best_val_operating_specificity = -1.0
+    best_val_specificity = -1.0
     patience = 20
     epochs_without_improvement = 0
     layer4_unfrozen = False
@@ -890,7 +745,7 @@ def train_ham10000_model(model_type, image_source):
         )
         val_logits, val_targets = collect_logits(model, val_loader, device)
         val_scores = scores_from_logits(val_logits)
-        val_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+        val_threshold, val_threshold_metrics = choose_threshold_for_sensitivity(
             val_targets,
             val_scores.tolist(),
             BINARY_LABELS,
@@ -899,25 +754,20 @@ def train_ham10000_model(model_type, image_source):
         )
 
         log_row = {"epoch": epoch, "learning_rate": optimizer.param_groups[0]["lr"]}
-        log_row.update(wandb_metrics("train", train_metrics))
-        log_row.update(wandb_metrics("val", val_metrics))
+        log_row["train/loss"] = train_metrics["loss"]
+        log_row["val/loss"] = val_metrics["loss"]
         log_row.update({
-            f"val_operating/{name}": value
-            for name, value in val_operating_metrics.items()
+            f"val/{name}": value
+            for name, value in val_threshold_metrics.items()
             if isinstance(value, (int, float))
         })
         wandb.log(log_row)
 
-        print_epoch(epoch, train_metrics, val_metrics)
-        print(
-            f"Val Operating Threshold: {val_threshold:.4f} | "
-            f"Val Operating Malig Recall: {val_operating_metrics['malignant_recall']:.4f} | "
-            f"Val Operating Malig Specificity: {val_operating_metrics['malignant_specificity']:.4f}"
-        )
+        print_epoch(epoch, train_metrics, val_metrics, val_threshold, val_threshold_metrics)
 
-        val_selection_score = val_operating_metrics["malignant_specificity"]
-        if val_selection_score > best_val_operating_specificity:
-            best_val_operating_specificity = val_selection_score
+        val_specificity = val_threshold_metrics["specificity"]
+        if val_specificity > best_val_specificity:
+            best_val_specificity = val_specificity
             epochs_without_improvement = 0
 
             checkpoint = {
@@ -930,53 +780,32 @@ def train_ham10000_model(model_type, image_source):
                 "pos_weight": pos_weight,
                 "malignant_threshold": val_threshold,
                 "target_sensitivity": TARGET_SENSITIVITY,
-                "val_operating_metrics": val_operating_metrics,
-                "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
-                "selection_score": val_selection_score,
+                "val_metrics": val_threshold_metrics,
+                "selection_metric": "val_specificity_at_target_sensitivity",
                 "val_loss": val_metrics["loss"],
-                "val_accuracy": val_metrics["accuracy"],
-                "val_macro_precision": val_metrics["macro_precision"],
-                "val_macro_recall": val_metrics["macro_recall"],
-                "val_macro_f1": val_metrics["macro_f1"],
-                "val_balanced_accuracy": val_metrics["balanced_accuracy"],
-                "val_binary_accuracy": val_metrics["binary_accuracy"],
-                "val_binary_macro_f1": val_metrics["binary_macro_f1"],
-                "val_binary_balanced_accuracy": val_metrics["binary_balanced_accuracy"],
-                "val_malignant_precision": val_metrics["malignant_precision"],
-                "val_malignant_recall": val_metrics["malignant_recall"],
-                "val_malignant_specificity": val_metrics["malignant_specificity"],
-                "val_malignant_f1": val_metrics["malignant_f1"],
-                "val_benign_recall": val_metrics["benign_recall"],
                 "config": {
                     **config,
                     "malignant_threshold": val_threshold,
-                    "selection_metric": "val_operating_malignant_specificity_at_target_sensitivity",
-                    "selection_score": val_selection_score,
+                    "selection_metric": "val_specificity_at_target_sensitivity",
                 },
             }
 
             torch.save(checkpoint, best_model_path)
 
             wandb.run.summary["best_epoch"] = epoch
-            wandb.run.summary["best_val_operating_threshold"] = val_threshold
-            wandb.run.summary["best_val_operating_malignant_recall"] = val_operating_metrics["malignant_recall"]
-            wandb.run.summary["best_val_operating_malignant_specificity"] = val_operating_metrics["malignant_specificity"]
-            wandb.run.summary["best_val_selection_score"] = val_selection_score
-            wandb.run.summary["best_val_macro_f1"] = val_metrics["macro_f1"]
-            wandb.run.summary["best_val_accuracy"] = val_metrics["accuracy"]
-            wandb.run.summary["best_val_balanced_accuracy"] = val_metrics["balanced_accuracy"]
-            wandb.run.summary["best_val_binary_accuracy"] = val_metrics["binary_accuracy"]
-            wandb.run.summary["best_val_binary_macro_f1"] = val_metrics["binary_macro_f1"]
-            wandb.run.summary["best_val_binary_balanced_accuracy"] = val_metrics["binary_balanced_accuracy"]
-            wandb.run.summary["best_val_malignant_recall"] = val_metrics["malignant_recall"]
-            wandb.run.summary["best_val_malignant_specificity"] = val_metrics["malignant_specificity"]
-            wandb.run.summary["best_val_benign_recall"] = val_metrics["benign_recall"]
+            wandb.run.summary["best_val_threshold"] = val_threshold
+            wandb.run.summary["best_val_sensitivity"] = val_threshold_metrics["sensitivity"]
+            wandb.run.summary["best_val_specificity"] = val_threshold_metrics["specificity"]
+            wandb.run.summary["best_val_accuracy"] = val_threshold_metrics["accuracy"]
+            wandb.run.summary["best_val_precision"] = val_threshold_metrics["precision"]
+            wandb.run.summary["best_val_f1"] = val_threshold_metrics["f1"]
+            wandb.run.summary["best_val_balanced_accuracy"] = val_threshold_metrics["balanced_accuracy"]
 
             wandb.save(best_model_path)
 
             print(
                 "Saved new best model: "
-                f"val_operating_malignant_specificity={val_selection_score:.4f}"
+                f"val_specificity={val_specificity:.4f}"
             )
         else:
             epochs_without_improvement += 1
@@ -992,7 +821,7 @@ def train_ham10000_model(model_type, image_source):
 
     val_logits, val_targets = collect_logits(model, val_loader, device)
     val_scores = scores_from_logits(val_logits)
-    malignant_threshold, val_operating_metrics = choose_threshold_for_sensitivity(
+    malignant_threshold, val_threshold_metrics = choose_threshold_for_sensitivity(
         val_targets,
         val_scores.tolist(),
         BINARY_LABELS,
@@ -1002,20 +831,20 @@ def train_ham10000_model(model_type, image_source):
 
     checkpoint["malignant_threshold"] = malignant_threshold
     checkpoint["target_sensitivity"] = TARGET_SENSITIVITY
-    checkpoint["val_operating_metrics"] = val_operating_metrics
+    checkpoint["val_metrics"] = val_threshold_metrics
     checkpoint["config"]["malignant_threshold"] = malignant_threshold
     torch.save(checkpoint, best_model_path)
 
-    print(f"Validation operating threshold: {malignant_threshold:.4f}")
-    print(f"Validation operating malignant recall: {val_operating_metrics['malignant_recall']:.4f}")
-    print(f"Validation operating malignant specificity: {val_operating_metrics['malignant_specificity']:.4f}")
+    print(f"Validation threshold: {malignant_threshold:.4f}")
+    print(f"Validation sensitivity: {val_threshold_metrics['sensitivity']:.4f}")
+    print(f"Validation specificity: {val_threshold_metrics['specificity']:.4f}")
 
-    val_operating_log = {
-        f"val_operating/{name}": value
-        for name, value in val_operating_metrics.items()
+    val_log = {
+        f"val/{name}": value
+        for name, value in val_threshold_metrics.items()
         if isinstance(value, (int, float))
     }
-    wandb.log(val_operating_log)
+    wandb.log(val_log)
 
     test_metrics = save_predictions(
         model,
@@ -1031,16 +860,11 @@ def train_ham10000_model(model_type, image_source):
     wandb.log(wandb_metrics("test", test_metrics))
     wandb.run.summary["test_loss"] = test_metrics["loss"]
     wandb.run.summary["test_accuracy"] = test_metrics["accuracy"]
-    wandb.run.summary["test_macro_f1"] = test_metrics["macro_f1"]
+    wandb.run.summary["test_precision"] = test_metrics["precision"]
+    wandb.run.summary["test_sensitivity"] = test_metrics["sensitivity"]
+    wandb.run.summary["test_specificity"] = test_metrics["specificity"]
+    wandb.run.summary["test_f1"] = test_metrics["f1"]
     wandb.run.summary["test_balanced_accuracy"] = test_metrics["balanced_accuracy"]
-    wandb.run.summary["test_binary_accuracy"] = test_metrics["binary_accuracy"]
-    wandb.run.summary["test_binary_macro_f1"] = test_metrics["binary_macro_f1"]
-    wandb.run.summary["test_binary_balanced_accuracy"] = test_metrics["binary_balanced_accuracy"]
-    wandb.run.summary["test_malignant_recall"] = test_metrics["malignant_recall"]
-    wandb.run.summary["test_malignant_specificity"] = test_metrics["malignant_specificity"]
-    wandb.run.summary["test_benign_recall"] = test_metrics["benign_recall"]
-    wandb.run.summary["operating_threshold"] = malignant_threshold
-    wandb.run.summary["test_operating_malignant_recall"] = test_metrics["operating_malignant_recall"]
-    wandb.run.summary["test_operating_malignant_specificity"] = test_metrics["operating_malignant_specificity"]
+    wandb.run.summary["threshold"] = malignant_threshold
 
     wandb.finish()
