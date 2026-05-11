@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_lesion_white_data.py", line 9, in <module>
+    create_pad_ufes20_lesion_white_data()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 164, in main
+    model = load_segmentation_model(device)
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 102, in load_segmentation_model
+    checkpoint = load_checkpoint(MODEL_PATH, device)
+  File "/ocean/projects/mth250011p/troemer/skin-lesions/src/data_setup/create_pad_ufes20_lesion_white_data.py", line 96, in load_checkpoint
+    return torch.load(path, map_location=device, weights_only=False)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/jet/home/troemer/.conda/envs/stat214/lib/python3.14/site-packages/torch/serialization.py", line 1500, in load
+    with _open_file_like(f, "rb") as opened_file:
+         ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/jet/home/troemer/.conda/envs/stat214/lib/python3.14/site-packages/torch/serialization.py", line 768, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/jet/home/troemer/.conda/envs/stat214/lib/python3.14/site-packages/torch/serialization.py", line 749, in __init__
+    super().__init__(open(name, mode))  # noqa: SIM115
+                     ~~~~^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/ocean/projects/mth250011p/troemer/skin-lesions/models/segmentation_unet_v2.pth'
