@@ -215,62 +215,6 @@ class SimpleResNet(nn.Module):
         return x
 
 
-class UNetConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1, base_channels=32):
-        super().__init__()
-
-        self.down1 = UNetConvBlock(in_channels, base_channels)
-        self.down2 = UNetConvBlock(base_channels, base_channels * 2)
-        self.down3 = UNetConvBlock(base_channels * 2, base_channels * 4)
-        self.bottleneck = UNetConvBlock(base_channels * 4, base_channels * 8)
-
-        self.pool = nn.MaxPool2d(2)
-        self.up3 = nn.ConvTranspose2d(base_channels * 8, base_channels * 4, kernel_size=2, stride=2)
-        self.conv3 = UNetConvBlock(base_channels * 8, base_channels * 4)
-        self.up2 = nn.ConvTranspose2d(base_channels * 4, base_channels * 2, kernel_size=2, stride=2)
-        self.conv2 = UNetConvBlock(base_channels * 4, base_channels * 2)
-        self.up1 = nn.ConvTranspose2d(base_channels * 2, base_channels, kernel_size=2, stride=2)
-        self.conv1 = UNetConvBlock(base_channels * 2, base_channels)
-        self.out = nn.Conv2d(base_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        down1 = self.down1(x)
-        down2 = self.down2(self.pool(down1))
-        down3 = self.down3(self.pool(down2))
-        bottleneck = self.bottleneck(self.pool(down3))
-
-        x = self.up3(bottleneck)
-        x = torch.cat((x, down3), dim=1)
-        x = self.conv3(x)
-
-        x = self.up2(x)
-        x = torch.cat((x, down2), dim=1)
-        x = self.conv2(x)
-
-        x = self.up1(x)
-        x = torch.cat((x, down1), dim=1)
-        x = self.conv1(x)
-
-        return self.out(x)
-
-
 def build_pretrained_resnet50(num_classes, use_pretrained=True):
     try:
         if hasattr(models, "ResNet50_Weights"):
@@ -346,13 +290,6 @@ def build_segmentation_model(config=None):
             out_channels=config.get("out_channels", 1),
             use_pretrained=config.get("use_pretrained_backbone", False),
             aux_loss=config.get("aux_loss", True),
-        )
-
-    if model_name == "UNet":
-        return UNet(
-            in_channels=config.get("in_channels", 3),
-            out_channels=config.get("out_channels", 1),
-            base_channels=config.get("base_channels", 32),
         )
 
     raise ValueError(f"Unknown segmentation model: {model_name}")

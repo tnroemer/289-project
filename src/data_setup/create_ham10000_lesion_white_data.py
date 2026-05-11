@@ -26,7 +26,6 @@ def main():
 
     rows = []
     created = 0
-    skipped_existing = 0
     missing_images = 0
     missing_masks = 0
 
@@ -36,29 +35,27 @@ def main():
         mask_path = os.path.join(MASK_DIR, image_id + "_mask.png")
         output_path = os.path.join(LESION_IMAGE_DIR, image_id + ".jpg")
 
-        if os.path.exists(output_path):
-            skipped_existing += 1
-        elif not os.path.exists(image_path):
+        if not os.path.exists(image_path):
             missing_images += 1
             continue
-        elif not os.path.exists(mask_path):
+        if not os.path.exists(mask_path):
             missing_masks += 1
             continue
-        else:
-            with Image.open(image_path) as image, Image.open(mask_path) as mask:
-                image = image.convert("RGB")
-                mask = mask.convert("L")
 
-                if mask.size != image.size:
-                    mask = mask.resize(image.size, Image.NEAREST)
+        with Image.open(image_path) as image, Image.open(mask_path) as mask:
+            image = image.convert("RGB")
+            mask = mask.convert("L")
 
-                mask = mask.point(lambda p: 255 if p > 127 else 0)
+            if mask.size != image.size:
+                mask = mask.resize(image.size, Image.NEAREST)
 
-                white_background = Image.new("RGB", image.size, (255, 255, 255))
-                lesion_image = Image.composite(image, white_background, mask)
-                lesion_image.save(output_path, quality=95)
+            mask = mask.point(lambda p: 255 if p > 127 else 0)
 
-            created += 1
+            white_background = Image.new("RGB", image.size, (255, 255, 255))
+            lesion_image = Image.composite(image, white_background, mask)
+            lesion_image.save(output_path, quality=95)
+
+        created += 1
 
         output_row = row.to_dict()
         output_row["original_image_path"] = image_path
@@ -71,7 +68,6 @@ def main():
     manifest_df.to_csv(OUTPUT_METADATA_PATH, index=False)
 
     print(f"Created lesion-white images: {created}")
-    print(f"Already existed: {skipped_existing}")
     print(f"Missing original images: {missing_images}")
     print(f"Missing masks: {missing_masks}")
     print(f"Output folder: {LESION_IMAGE_DIR}")
