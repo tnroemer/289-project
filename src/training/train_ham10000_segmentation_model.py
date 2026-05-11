@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import torch
+import wandb
 
 from PIL import Image
 from torch import nn
@@ -282,11 +283,32 @@ def main():
         "mask_threshold": mask_threshold,
         "use_pretrained_backbone": True,
         "aux_loss": True,
+        "dataset": "ham10000",
+        "target": "lesion_segmentation_mask",
+        "mask_source": MASK_DIR,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "epochs": num_epochs,
+        "num_workers": num_workers,
+        "loss": "BCEWithLogitsLoss + DiceLoss",
+        "scheduler": "cosine_annealing_lr",
+        "train_size": len(train_df),
+        "val_size": len(val_df),
+        "test_size": len(test_df),
     }
     model = build_segmentation_model(config).to(device)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
+
+    if "WANDB_API_KEY" in os.environ:
+        wandb.login(key=os.environ["WANDB_API_KEY"])
+
+    wandb.init(
+        project="skin-cancer-cnn",
+        name="ham10000-segmentation-deeplabv3-resnet50",
+        config=config,
+    )
 
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(METRICS_DIR, exist_ok=True)
@@ -303,6 +325,17 @@ def main():
 
         rows.append({"epoch": epoch, "split": "train", **train_metrics})
         rows.append({"epoch": epoch, "split": "val", **val_metrics})
+
+        wandb.log({
+            "epoch": epoch,
+            "learning_rate": optimizer.param_groups[0]["lr"],
+            "train/loss": train_metrics["loss"],
+            "train/dice": train_metrics["dice"],
+            "train/iou": train_metrics["iou"],
+            "val/loss": val_metrics["loss"],
+            "val/dice": val_metrics["dice"],
+            "val/iou": val_metrics["iou"],
+        })
 
         print(
             f"Epoch {epoch}/{num_epochs} | "
@@ -329,6 +362,11 @@ def main():
                 },
             }
             torch.save(checkpoint, model_path)
+            wandb.run.summary["best_epoch"] = epoch
+            wandb.run.summary["best_val_dice"] = val_metrics["dice"]
+            wandb.run.summary["best_val_iou"] = val_metrics["iou"]
+            wandb.run.summary["best_val_loss"] = val_metrics["loss"]
+            wandb.save(model_path)
             print(f"Saved new best segmentation model: val_dice={best_val_dice:.4f}")
         else:
             epochs_without_improvement += 1
@@ -343,6 +381,15 @@ def main():
     rows.append({"epoch": checkpoint["epoch"], "split": "test", **test_metrics})
 
     pd.DataFrame(rows).to_csv(metrics_path, index=False)
+    wandb.log({
+        "test/loss": test_metrics["loss"],
+        "test/dice": test_metrics["dice"],
+        "test/iou": test_metrics["iou"],
+    })
+    wandb.run.summary["test_loss"] = test_metrics["loss"]
+    wandb.run.summary["test_dice"] = test_metrics["dice"]
+    wandb.run.summary["test_iou"] = test_metrics["iou"]
+    wandb.save(metrics_path)
 
     print(f"Best validation dice: {checkpoint['best_val_dice']:.4f}")
     print(f"Test Dice: {test_metrics['dice']:.4f}")
@@ -351,6 +398,7 @@ def main():
     print(f"Saved segmentation metrics: {metrics_path}")
 
     save_ham_masks(model, device)
+    wandb.finish()
 
 
 if __name__ == "__main__":
