@@ -4,11 +4,6 @@
 CS 289A (Spring 2026) final project — Tobias Roemer, Thomas Lee, Leo Li.
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tnroemer/289-project/main?labpath=notebooks)
-[![MyST site](https://img.shields.io/badge/website-MyST-blue)](https://tnroemer.github.io/289-project/)
-
-📖 **Live website:** <https://tnroemer.github.io/289-project/> — landing page plus
-both notebooks executed on the synthetic sample data, rebuilt on every push to
-`main` by [`.github/workflows/deploy-myst.yml`](.github/workflows/deploy-myst.yml).
 
 Skin-lesion classifiers trained end-to-end on dermoscopic images can exploit
 non-lesion context (skin texture, hair, rulers, lighting artifacts) instead of
@@ -101,32 +96,13 @@ the checkpoint that 02 reads).
 
 Both default to `SAMPLE = True` and use the small synthetic dataset in
 `data/sample/`, so they run top-to-bottom in seconds on CPU with no kagglehub
-credentials — this is what Binder and the website use. Set `SAMPLE = False`
+credentials — this is what Binder uses. Set `SAMPLE = False`
 (top of each notebook) to point them at the real HAM10000 / ISIC-2018 data on a
 machine that has it.
 
 Reproducibility check: `pip install -r requirements.txt`, then
 `python -m data_setup.make_sample_data`, then *Restart Kernel & Run All* on
 `01` then `02`.
-
-## Website (MyST)
-
-The repo is configured to build a [MyST](https://mystmd.org/) site from
-`index.md` plus the two executed notebooks:
-
-```bash
-npm install -g mystmd
-python -m data_setup.make_sample_data
-myst start            # local preview
-myst build --html --execute
-```
-
-`.github/workflows/deploy-myst.yml` builds and deploys this site to GitHub Pages
-on every push to `main`, publishing it at <https://tnroemer.github.io/289-project/>.
-The `build` job (site + executed notebooks) runs on every push; the `deploy`
-job requires a **one-time repo-owner action**: Settings → Pages → "Build and
-deployment" → Source = **GitHub Actions** (admin only; for a private repo this
-needs a plan that allows Pages, or set the Pages visibility to public).
 
 ## Citation of adapted code
 
