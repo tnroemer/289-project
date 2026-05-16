@@ -216,5 +216,3 @@ models/*
 # Local tooling / OS junk — never submit
 .DS_Store
 **/.DS_Store
-CLAUDE.md
-.claude/

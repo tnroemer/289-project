@@ -10,8 +10,13 @@ from torchvision import transforms
 from models.model_architectures import build_segmentation_model
 
 
-DATA_ROOT = "/ocean/projects/mth250011p/troemer"
-RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
+# Configurable for reproducibility; defaults keep the repo self-contained.
+# Override on a cluster via SKIN_LESIONS_DATA_ROOT / SKIN_LESIONS_RUN_DIR.
+DATA_ROOT = os.environ.get(
+    "SKIN_LESIONS_DATA_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
+RUN_DIR = os.environ.get("SKIN_LESIONS_RUN_DIR", DATA_ROOT)
 
 INPUT_DIR = os.path.join(RUN_DIR, "data", "pad-ufes-20-images")
 INPUT_METADATA_PATH = os.path.join(INPUT_DIR, "metadata.csv")

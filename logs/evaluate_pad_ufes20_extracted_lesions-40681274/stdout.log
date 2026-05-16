@@ -1,9 +1,0 @@
-Log directory: /ocean/projects/mth250011p/troemer/skin-lesions/logs/evaluate_pad_ufes20_extracted_lesions-40681274
-Job started on Fri May  8 17:51:13 EDT 2026
-Running on node: v011.ib.bridges2.psc.edu
-Working directory: /ocean/projects/mth250011p/troemer/skin-lesions
-Python location: /jet/home/troemer/.conda/envs/stat214/bin/python
-Python version: Python 3.14.3
-Missing extracted lesion manifest: /ocean/projects/mth250011p/troemer/skin-lesions/data/pad-ufes-20-extracted-lesions/metadata.csv
-Trying to rebuild it from existing extracted PAD-UFES-20 images.
-Metadata path: /ocean/projects/mth250011p/troemer/datasets/pad-ufes-20/metadata.csv

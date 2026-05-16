@@ -15,8 +15,13 @@ from models.lora import is_lora_parameter_name
 from models.model_architectures import build_model
 
 
-DATA_ROOT = "/ocean/projects/mth250011p/troemer"
-RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
+# Configurable for reproducibility; defaults keep the repo self-contained.
+# Override on a cluster via SKIN_LESIONS_DATA_ROOT / SKIN_LESIONS_RUN_DIR.
+DATA_ROOT = os.environ.get(
+    "SKIN_LESIONS_DATA_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
+RUN_DIR = os.environ.get("SKIN_LESIONS_RUN_DIR", DATA_ROOT)
 SPLIT_DIR = os.path.join(RUN_DIR, "data", "splits")
 CHECKPOINT_DIR = os.path.join(RUN_DIR, "models")
 PRED_DIR = os.path.join(RUN_DIR, "preds")

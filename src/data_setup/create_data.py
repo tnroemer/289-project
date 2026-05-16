@@ -8,10 +8,16 @@ import pandas as pd
 from PIL import Image
 
 
-os.environ["KAGGLEHUB_CACHE"] = "/ocean/projects/mth250011p/troemer/"
+# Paths are configurable so anyone can reproduce the pipeline. The defaults
+# make the repo self-contained (data/ under the repo root); on a cluster,
+# override with the SKIN_LESIONS_DATA_ROOT / SKIN_LESIONS_RUN_DIR env vars.
+DATA_ROOT = os.environ.get(
+    "SKIN_LESIONS_DATA_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
+RUN_DIR = os.environ.get("SKIN_LESIONS_RUN_DIR", DATA_ROOT)
 
-DATA_ROOT = "/ocean/projects/mth250011p/troemer"
-RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
+os.environ.setdefault("KAGGLEHUB_CACHE", DATA_ROOT)
 
 HAM_DATASET_DIR = os.path.join(DATA_ROOT, "datasets", "skin-cancer-mnist-ham10000")
 HAM_KAGGLE_DATASET_DIR = os.path.join(

@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-REPO_DIR="/ocean/projects/mth250011p/troemer/skin-lesions"
+REPO_DIR="${SKIN_LESIONS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 JOB_NAME="${SLURM_JOB_NAME:-$(basename "$0" .sh)}"

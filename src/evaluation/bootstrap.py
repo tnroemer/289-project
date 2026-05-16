@@ -4,8 +4,13 @@ import numpy as np
 import pandas as pd
 
 
-DATA_ROOT = "/ocean/projects/mth250011p/troemer"
-RUN_DIR = os.path.join(DATA_ROOT, "skin-lesions")
+# Configurable for reproducibility; defaults keep the repo self-contained.
+# Override on a cluster via SKIN_LESIONS_DATA_ROOT / SKIN_LESIONS_RUN_DIR.
+DATA_ROOT = os.environ.get(
+    "SKIN_LESIONS_DATA_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
+RUN_DIR = os.environ.get("SKIN_LESIONS_RUN_DIR", DATA_ROOT)
 PRED_DIR = os.path.join(RUN_DIR, "preds")
 METRICS_DIR = os.path.join(RUN_DIR, "metrics")
 

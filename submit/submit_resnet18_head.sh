@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-REPO_DIR="/ocean/projects/mth250011p/troemer/skin-lesions"
+REPO_DIR="${SKIN_LESIONS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 JOB_NAME="${SLURM_JOB_NAME:-$(basename "$0" .sh)}"
@@ -29,8 +29,9 @@ echo "Working directory: $(pwd)"
 
 module load anaconda3/2024.10-1
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate /jet/home/troemer/.conda/envs/stat214
-source /ocean/projects/mth250011p/troemer/.wandb_env
+conda activate "${SKIN_LESIONS_CONDA_ENV:-stat214}"
+WANDB_ENV_FILE="${WANDB_ENV_FILE:-${REPO_DIR}/.wandb_env}"
+if [ -f "$WANDB_ENV_FILE" ]; then source "$WANDB_ENV_FILE"; fi
 echo "Python location: $(which python)"
 echo "Python version: $(python --version)"
 export PYTHONUNBUFFERED=1
@@ -44,6 +45,6 @@ export NUMEXPR_NUM_THREADS="$THREADS"
 
 PYTHON_MODULE="training.train_resnet18_head"
 
-/jet/home/troemer/.conda/envs/stat214/bin/python -m "$PYTHON_MODULE"
+python -m "$PYTHON_MODULE"
 
 echo "Job finished on $(date)"

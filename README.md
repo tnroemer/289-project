@@ -64,11 +64,23 @@ python -m evaluation.evaluate_pad_ufes20_full_image_models
 python -m evaluation.bootstrap                       # 95% bootstrap CIs from preds/*.csv
 ```
 
-On PSC Bridges-2: `sbatch submit/submit_full_pipeline.sh` (jobs chained with
-`--dependency=afterok`). Many paths are hardcoded to
-`/ocean/projects/mth250011p/...`; running end-to-end elsewhere requires editing
-the `DATA_ROOT` / `RUN_DIR` constants at the top of the scripts named in
-[`CLAUDE.md`](CLAUDE.md). W&B logging is enabled (project `skin-cancer-cnn`).
+By default every path is **repo-relative** (data under `./data`, checkpoints
+under `./models`, etc.), so the pipeline runs from a fresh clone with no path
+edits — you only need Kaggle credentials for `kagglehub` and a GPU for the full
+training runs. To target a different layout (e.g. a cluster scratch dir),
+override via environment variables — no source edits required:
+
+```bash
+export SKIN_LESIONS_DATA_ROOT=/path/to/datasets   # kagglehub cache + datasets
+export SKIN_LESIONS_RUN_DIR=/path/to/run          # data/, models/, preds/, metrics/
+```
+
+The SLURM scripts auto-detect the repo root from their own location and pick
+the conda env from `SKIN_LESIONS_CONDA_ENV` (default `stat214`); W&B is loaded
+only if `WANDB_ENV_FILE` (default `<repo>/.wandb_env`) exists. On PSC
+Bridges-2: `sbatch submit/submit_full_pipeline.sh` (jobs chained with
+`--dependency=afterok`). W&B logging is enabled when configured (project
+`skin-cancer-cnn`).
 
 **Key conventions:** binary classification with one logit + `BCEWithLogitsLoss`
 (`pos_weight = #benign/#malignant`); model selection by **highest validation
