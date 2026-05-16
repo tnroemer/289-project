@@ -1,4 +1,4 @@
-# Lesion-Focused Classification for Skin Cancer Detection
+# Do Lesion-Focused Inputs Improve Skin Cancer Classification Under Domain Shift?
 
 **Does background suppression help generalization?**
 CS 289A (Spring 2026) final project — Tobias Roemer, Thomas Lee, Leo Li.
