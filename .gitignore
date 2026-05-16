@@ -206,7 +206,15 @@ marimo/_lsp/
 __marimo__/
 
 data/*
+!data/sample/
+!data/sample/**
 models/*
 !logs/.gitkeep
 !models/.gitkeep
 !preds/.gitkeep
+
+# Local tooling / OS junk — never submit
+.DS_Store
+**/.DS_Store
+CLAUDE.md
+.claude/

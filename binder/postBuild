@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Generate the small synthetic sample dataset so both notebooks run end-to-end
+# on Binder with no kagglehub credentials.
+set -euo pipefail
+PYTHONPATH=src python -m data_setup.make_sample_data

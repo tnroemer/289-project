@@ -1,0 +1,17 @@
+# Runtime + notebook dependencies for the lesion-focused skin-cancer project.
+# Pinned to a mutually compatible CPU set so a fresh clone / Binder build of
+# notebooks/ works without a GPU or kagglehub credentials.
+# (The cluster training pipeline under src/ uses the newer torch pinned in
+# pyproject.toml; these notebook pins are intentionally conservative.)
+numpy<2
+pandas
+scipy
+matplotlib
+pillow
+tqdm
+torch==2.2.2
+torchvision==0.17.2
+# Notebook execution / website build
+jupyter
+nbclient
+ipykernel

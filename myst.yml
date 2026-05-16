@@ -1,0 +1,32 @@
+version: 1
+project:
+  id: cs289a-lesion-focused-skin-cancer
+  title: Lesion-Focused Classification for Skin Cancer Detection
+  description: >-
+    Does suppressing the non-lesion background improve skin-lesion
+    classification and out-of-distribution generalization? CS 289A project
+    (Roemer, Lee, Li).
+  authors:
+    - name: Tobias Roemer
+    - name: Thomas Lee
+    - name: Leo Li
+  github: https://github.com/tnroemer/289-project
+  # Notebooks default to SAMPLE=True and run on the small synthetic dataset
+  # created by `python -m data_setup.make_sample_data`, so the site builds
+  # without kagglehub credentials or a GPU.
+  toc:
+    - file: index.md
+    - title: Notebooks
+      children:
+        - file: notebooks/01_segmentation.ipynb
+        - file: notebooks/02_lesion_focused.ipynb
+  exclude:
+    - .venv/**
+    - logs/**
+    - models/**
+    - preds/**
+    - metrics/**
+site:
+  template: book-theme
+  options:
+    logo_text: Lesion-Focused Skin Cancer

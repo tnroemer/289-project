@@ -1,0 +1,2 @@
+# Binder reads this file. Reuse the project's pinned set.
+-r ../requirements.txt
