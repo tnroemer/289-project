@@ -4,6 +4,11 @@
 CS 289A (Spring 2026) final project — Tobias Roemer, Thomas Lee, Leo Li.
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tnroemer/289-project/main?labpath=notebooks)
+[![MyST site](https://img.shields.io/badge/website-MyST-blue)](https://tnroemer.github.io/289-project/)
+
+📖 **Live website:** <https://tnroemer.github.io/289-project/> — landing page plus
+both notebooks executed on the synthetic sample data, rebuilt on every push to
+`main` by [`.github/workflows/deploy-myst.yml`](.github/workflows/deploy-myst.yml).
 
 Skin-lesion classifiers trained end-to-end on dermoscopic images can exploit
 non-lesion context (skin texture, hair, rulers, lighting artifacts) instead of
@@ -117,7 +122,11 @@ myst build --html --execute
 ```
 
 `.github/workflows/deploy-myst.yml` builds and deploys this site to GitHub Pages
-on every push to `main` (enable Pages → "GitHub Actions" in repo settings).
+on every push to `main`, publishing it at <https://tnroemer.github.io/289-project/>.
+The `build` job (site + executed notebooks) runs on every push; the `deploy`
+job requires a **one-time repo-owner action**: Settings → Pages → "Build and
+deployment" → Source = **GitHub Actions** (admin only; for a private repo this
+needs a plan that allows Pages, or set the Pages visibility to public).
 
 ## Citation of adapted code
 
